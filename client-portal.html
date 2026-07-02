@@ -1655,7 +1655,7 @@ function renderField(f, saved) {
     return `<div class="field" id="fw-${f.key}">
       <label class="field-lbl">${esc(f.label)}</label>
       <div style="display:flex;gap:10px">
-        ${['font-selections-1.jpg','font-selections-2.jpg'].map(src => `
+        ${['font-selections-1.png','font-selections-2.png'].map(src => `
         <a href="javascript:void(0)" onclick="openFontZoom('${src}')" style="flex:1;min-width:0">
           <img src="${src}" alt="Signature font selections — tap to enlarge" style="width:100%;border:.5px solid var(--border);border-radius:8px;display:block;background:var(--white)" onerror="this.closest('a').style.display='none'">
         </a>`).join('')}
@@ -1881,10 +1881,8 @@ function renderProofModalBody(mode, wg) {
   const body = document.getElementById('proof-modal-body')
   const eyebrow = document.getElementById('proof-modal-eyebrow')
 
-  if (mode === 'review') {
-    // Per-item rounds aren't tracked as a number — derive a friendly label from status.
-    const st = wg?.proof_status || ''
-    eyebrow.textContent = /R2/.test(st) ? 'Final proof' : /R1/.test(st) ? 'Revised proof' : 'Your proof'
+  // Shared proof gallery — used in the review view AND kept visible while leaving feedback
+  function proofGalleryHtml(wg) {
     const proofLink = wg?.proof_link || ''
     // proof_link may hold several comma-separated Cloudinary URLs; render images inline.
     const urls = proofLink.split(',').map(u => u.trim()).filter(Boolean)
@@ -1892,7 +1890,7 @@ function renderProofModalBody(mode, wg) {
     const gallery = urls.filter(isImg).map(u =>
       `<a href="${escAttr(u)}" target="_blank" style="display:block"><img src="${escAttr(u)}" alt="Your proof" style="width:100%;border-radius:8px;border:.5px solid var(--border);display:block"/></a>`).join('')
     const extLinks = urls.filter(u => !isImg(u))
-    body.innerHTML = `
+    return `
       <div style="background:var(--white);border-radius:10px;padding:${gallery ? '14px' : '28px 20px'};display:flex;flex-direction:column;align-items:center;gap:10px;border:1px ${gallery ? 'solid var(--border)' : 'dashed rgba(44,37,25,.18)'};text-align:center;margin-bottom:16px">
         ${gallery || `<div style="font-size:28px;color:var(--muted);opacity:.6">↗</div>
         <div style="font-family:var(--serif);font-size:16px;color:var(--ink)">Your proof</div>
@@ -1900,7 +1898,15 @@ function renderProofModalBody(mode, wg) {
         ${extLinks.map(u => `<a href="${escAttr(u)}" target="_blank" style="margin-top:6px;padding:10px 18px;background:var(--blue);color:#fff;border-radius:8px;font-size:12px;letter-spacing:.05em;text-decoration:none">Open proof ↗</a>`).join('')}
         ${!urls.length ? '<div style="font-size:12.5px;color:var(--muted)">Proof link coming from Ashley — check your email.</div>' : ''}
         ${gallery ? '<div style="font-size:11.5px;color:var(--muted)">Tap an image to open it full size.</div>' : ''}
-      </div>
+      </div>`
+  }
+
+  if (mode === 'review') {
+    // Per-item rounds aren't tracked as a number — derive a friendly label from status.
+    const st = wg?.proof_status || ''
+    eyebrow.textContent = /R2/.test(st) ? 'Final proof' : /R1/.test(st) ? 'Revised proof' : 'Your proof'
+    body.innerHTML = `
+      ${proofGalleryHtml(wg)}
       <div style="background:rgba(185,155,80,.1);border-left:2px solid rgba(185,155,80,.35);padding:12px 14px;border-radius:6px;font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:16px">
         <strong style="color:#7a5f10;font-weight:500">A note from Ashley:</strong> Take your time — check every name, date, and address. Two rounds of revisions are included.
       </div>
@@ -1926,8 +1932,10 @@ function renderProofModalBody(mode, wg) {
 
   if (mode === 'revise') {
     eyebrow.textContent = 'Request changes'
+    const wgR = wg || find(proofModalGid)
     body.innerHTML = `
-      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">Let Ashley know what you'd like adjusted — the more specific, the faster your revised proof will come back.</p>
+      ${proofGalleryHtml(wgR)}
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">Let Ashley know what you'd like adjusted — scroll the proof above while you write. The more specific, the faster your revised proof will come back.</p>
       <textarea id="per-item-rev-notes" rows="6" placeholder="e.g., Please change the ceremony time to 5:00 PM and adjust the spacing under our names…"
         style="width:100%;padding:14px;font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--white);border:1px solid var(--border);border-radius:10px;outline:none;min-height:140px;resize:vertical;line-height:1.6"></textarea>
       <div style="display:flex;gap:10px;margin-top:14px">
