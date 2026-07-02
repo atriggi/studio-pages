@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<!-- client-portal-v13.html
+  Integrates Design prototype UX (phase groupings, task cards, full-screen focused form,
+  progress ring, rich field types, 3-state proof modal) with v12's Supabase backend.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Your Wedding Portal — Ashley Triggiano Fine Art + Stationery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Jost:wght@300;400;500&family=Pinyon+Script&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #f0ede7; --cream-2: #ede9e2;
+      --blush: #efd4cb; --blush-deep: #d8a899;
+      --blue: #6987a8; --blue-deep: #5a7494;
+      --ltblue: #b7cbd8;
+      --ink: #2c2519; --muted: #7a6e63; --muted-2: #9a958f;
+      --white: #fff;
+      --border: rgba(44,37,25,.1); --border-strong: rgba(44,37,25,.18);
+      --imgbg: #e8e4de;
+      --r: 14px;
+      --serif: 'Cormorant Garamond', Georgia, serif;
+      --script: 'Pinyon Script', 'Snell Roundhand', cursive;
+      --sans: 'Jost', -apple-system, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--cream); color: var(--ink);
+      font-family: var(--sans); font-weight: 300;
+      min-height: 100vh; -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── LOADING ── */
+    #loading {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+    }
+    .load-logo { font-family: var(--serif); font-size: 17px;
+      letter-spacing: .26em; text-transform: uppercase; color: var(--muted); }
+    .load-ring { width: 26px; height: 26px; border: 1.5px solid var(--ltblue);
+      border-top-color: var(--blue); border-radius: 50%;
+      animation: spin .85s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ERROR ── */
+    #error {
+      display: none; min-height: 100vh; flex-direction: column;
+      align-items: center; justify-content: center; padding: 40px 24px;
+      text-align: center; gap: 14px;
+    }
+    #error .e-ico { font-size: 32px; opacity: .35; }
+    #error h2 { font-family: var(--serif); font-size: 24px; font-weight: 400; }
+    #error p { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 340px; }
+    #error a { color: var(--blue); text-decoration: none; font-size: 14px; }
+
+    /* ── PORTAL ── */
+    #portal { display: none; flex-direction: column; min-height: 100vh; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp .35s ease both; }
+
+    /* ── HEADER ── */
+    .p-header { text-align: center; padding: 32px 24px 16px; background: var(--cream); }
+    .p-header::after {
+      content: ''; display: block; width: 38px; height: .5px;
+      background: var(--blue); opacity: .35; margin: 14px auto 0;
+    }
+    .p-wordmark { font-family: var(--serif); font-size: 12px;
+      letter-spacing: .32em; text-transform: uppercase; color: var(--muted); }
+    .p-sub { font-size: 9.5px; letter-spacing: .26em; text-transform: uppercase;
+      color: var(--muted); opacity: .6; margin-top: 4px; display: block; }
+
+    /* ── WELCOME ── */
+    .p-welcome { padding: 12px 24px 22px; text-align: center;
+      max-width: 560px; margin: 0 auto; width: 100%; }
+    .p-greeting { font-family: var(--serif); font-size: 40px;
+      font-weight: 300; line-height: 1.1; margin-bottom: 10px; }
+    .p-intro { font-size: 13.5px; color: var(--muted); line-height: 1.7;
+      max-width: 380px; margin: 0 auto; }
+    .date-pill {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-top: 16px; padding: 8px 16px;
+      background: var(--white); border: .5px solid var(--border);
+      border-radius: 999px; font-size: 11.5px; color: var(--muted); letter-spacing: .04em;
+    }
+    .date-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blush-deep); }
+
+    /* ── PROOF BANNER ── */
+    .proof-banner {
+      display: none; max-width: 560px; margin: 0 auto 6px; width: 100%;
+      padding: 0 16px;
+    }
+    .proof-banner.visible { display: block; }
+    .proof-banner-inner {
+      background: var(--white); border-radius: var(--r);
+      border: 1px solid rgba(105,135,168,.35);
+      box-shadow: 0 4px 24px -8px rgba(105,135,168,.25);
+      overflow: hidden;
+    }
+    .proof-banner-bar { height: 3px; background: linear-gradient(90deg, var(--blush), var(--blue)); }
+    .proof-banner-body { padding: 20px 22px; }
+    .eyebrow {
+      font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+      color: var(--muted); font-weight: 500;
+    }
+    .eyebrow.blue { color: var(--blue); }
+    .eyebrow.green { color: #3a6a3a; }
+    .proof-banner-title {
+      font-family: var(--serif); font-size: 22px;
+      font-weight: 400; color: var(--ink); margin: 4px 0 6px; line-height: 1.2;
+    }
+    .proof-banner-note {
+      font-size: 12.5px; color: var(--muted); line-height: 1.65; margin-bottom: 14px; max-width: 360px;
+    }
+
+    /* ── WEDDING BASICS CARD ── */
+    .wedding-basics-card {
+      max-width: 560px; margin: 16px auto 0; width: 100%; padding: 0 16px;
+    }
+    .wbc-inner {
+      background: var(--white); border: .5px solid var(--border);
+      border-radius: var(--r); padding: 16px 20px;
+      display: grid; grid-template-columns: 40px 1fr;
+      align-items: center; gap: 16px;
+    }
+    .wbc-icon {
+      width: 40px; height: 40px; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+
+    /* ── PROGRESS RING ── */
+    .progress-section {
+      max-width: 560px; margin: 16px auto 0; width: 100%; padding: 0 16px;
+    }
+    .progress-card {
+      background: var(--white); border: .5px solid var(--border);
+      border-radius: var(--r); padding: 18px 20px;
+      display: grid; grid-template-columns: 64px 1fr;
+      align-items: center; gap: 18px;
+    }
+
+    /* ── PHASE SECTION ── */
+    .phase-section {
+      max-width: 560px; margin: 0 auto; width: 100%; padding: 20px 16px 0;
+    }
+    .phase-header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 0 4px 10px; gap: 12;
+    }
+    .phase-label { font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+      color: var(--muted); font-weight: 500; }
+    .phase-blurb { font-size: 12px; color: var(--muted); margin-top: 3px;
+      font-style: italic; line-height: 1.5; }
+    .phase-awaiting { font-size: 10.5px; color: var(--blue); letter-spacing: .06em;
+      white-space: nowrap; padding-top: 2px; }
+    .phase-cards { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ── TASK CARD ── */
+    .task-card {
+      background: var(--white); border: .5px solid var(--border);
+      border-radius: var(--r); padding: 0; cursor: pointer; text-align: left;
+      width: 100%; overflow: hidden; transition: box-shadow .15s, border-color .15s;
+      font-family: var(--sans); position: relative;
+    }
+    .task-card:hover { box-shadow: 0 8px 28px -16px rgba(44,37,25,.22);
+      border-color: var(--border-strong); }
+    .task-card.dormant { opacity: .55; pointer-events: none; }
+    .task-card-inner {
+      display: grid; grid-template-columns: 1fr 44px;
+      gap: 16px; padding: 20px; align-items: center;
+    }
+    .task-title { font-family: var(--serif); font-size: 19px;
+      font-weight: 500; color: var(--ink); line-height: 1.2; }
+    .task-meta { font-size: 11.5px; color: var(--muted);
+      margin-top: 4px; letter-spacing: .02em; }
+    .task-time { display: inline-flex; align-items: center; gap: 5px; }
+    .task-arrow {
+      width: 44px; height: 44px; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0; transition: background .15s;
+    }
+    .task-arrow.active { background: var(--blue); color: #fff; }
+    .task-arrow.inactive { background: var(--cream); color: var(--muted); }
+    .task-progress-bar { height: 2px; background: linear-gradient(90deg, var(--blue) 60%, var(--ltblue) 60%); }
+
+    /* ── STATUS PILL ── */
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px;
+      font-size: 10.5px; letter-spacing: .04em; font-weight: 500;
+      white-space: nowrap; margin-left: 6px;
+    }
+    .status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .sp-action  { background: rgba(105,135,168,.12); color: var(--blue); }
+    .sp-progress{ background: rgba(122,110,99,.1); color: var(--muted); }
+    .sp-review  { background: rgba(185,155,80,.14); color: #7a5f10; }
+    .sp-approved{ background: rgba(80,140,80,.12); color: #3a6a3a; }
+    .sp-dormant { background: rgba(183,203,216,.2); color: var(--muted); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── FOCUSED FORM VIEW (full-screen) ── */
+    #focused-view {
+      display: none; position: fixed; inset: 0; z-index: 50;
+      background: var(--cream); flex-direction: column; overflow: hidden;
+    }
+    #focused-view.open { display: flex; animation: fadeUp .3s ease both; }
+    .fv-header {
+      flex-shrink: 0; padding: 12px 16px; background: var(--white);
+      border-bottom: .5px solid var(--border);
+      display: grid; grid-template-columns: 44px 1fr 44px;
+      align-items: center; gap: 12;
+    }
+    .fv-back {
+      width: 44px; height: 44px; border-radius: 10px; border: 0;
+      background: var(--cream); color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .fv-title-wrap { text-align: center; }
+    .fv-item-title { font-family: var(--serif); font-size: 18px; font-weight: 500;
+      color: var(--ink); line-height: 1.2; margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fv-save-btn {
+      background: transparent; border: 0; color: var(--muted); cursor: pointer;
+      font-size: 12px; padding: 10px 4px; letter-spacing: .04em;
+      font-family: var(--sans); text-align: right;
+    }
+    .fv-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 20px 18px 130px; }
+    .fv-form-inner { max-width: 540px; margin: 0 auto; }
+    .fv-footer {
+      flex-shrink: 0; padding: 12px 16px 20px;
+      background: var(--white); border-top: .5px solid var(--border);
+      box-shadow: 0 -6px 14px -8px rgba(44,37,25,.08);
+    }
+
+    /* ── PROOF MODAL ── */
+    #proof-overlay {
+      display: none; position: fixed; inset: 0; z-index: 60;
+      background: rgba(44,37,25,.55);
+      align-items: flex-end; justify-content: center;
+    }
+    #proof-overlay.open { display: flex; animation: fadeUp .3s ease both; }
+    .proof-sheet {
+      width: 100%; max-width: 560px; max-height: 94vh;
+      background: var(--cream); border-radius: 18px 18px 0 0;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .proof-handle {
+      padding: 10px 0; display: flex; justify-content: center; flex-shrink: 0;
+    }
+    .proof-handle span { width: 38px; height: 4px; background: var(--border-strong); border-radius: 2px; }
+    .proof-head {
+      padding: 0 22px 14px; display: flex; justify-content: space-between;
+      align-items: center; border-bottom: .5px solid var(--border); flex-shrink: 0;
+    }
+    .proof-body { overflow-y: auto; padding: 20px 22px 26px; flex: 1; }
+    .proof-close {
+      width: 44px; height: 44px; border-radius: 50%; border: 0;
+      background: var(--white); color: var(--muted); cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── FORM FIELDS ── */
+    .field { margin-bottom: 16px; }
+    .field-lbl {
+      display: block; font-size: 11px; letter-spacing: .07em; color: var(--muted);
+      margin-bottom: 6px; text-transform: uppercase; line-height: 1.4;
+    }
+    .field-lbl .req { color: var(--blue); margin-left: 2px; }
+    .field input[type=text], .field input[type=email], .field textarea, .field select {
+      width: 100%; padding: 12px 13px; border: 1px solid var(--border);
+      border-radius: 9px; font-family: var(--sans); font-size: 14px;
+      font-weight: 300; color: var(--ink); background: var(--cream);
+      outline: none; transition: border-color .15s, background .15s; -webkit-appearance: none;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      border-color: var(--blue); background: var(--white);
+    }
+    .field textarea { resize: vertical; min-height: 88px; line-height: 1.6;
+      font-family: var(--serif); font-size: 14.5px; }
+    .field.error input, .field.error textarea { border-color: #c0392b; }
+    .field-hint { font-size: 11px; color: var(--muted); opacity: .8;
+      margin-top: 6px; font-style: italic; line-height: 1.55; }
+    .form-divider { height: .5px; background: var(--border); margin: 20px 0; }
+    .form-section-title { font-family: var(--serif); font-size: 17px;
+      font-weight: 400; color: var(--ink); margin-bottom: 14px; }
+
+    /* Color swatches */
+    .color-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px,1fr)); gap: 8px; margin-top: 4px; }
+    .swatch-btn { display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 4px; border: 0; background: transparent; cursor: pointer; }
+    .swatch-circle {
+      width: 36px; height: 36px; border-radius: 50%;
+      transition: transform .12s, box-shadow .12s;
+    }
+    .swatch-circle.light { border: 1px solid rgba(44,37,25,.18); }
+    .swatch-circle.selected {
+      border: 2.5px solid var(--blue);
+      box-shadow: 0 0 0 3px rgba(105,135,168,.2), 0 2px 6px rgba(44,37,25,.18);
+      transform: scale(1.07);
+    }
+    .swatch-name { font-size: 9.5px; color: var(--muted); letter-spacing: .02em;
+      line-height: 1.2; text-align: center; }
+    .swatch-name.selected { color: var(--blue); font-weight: 500; }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; background: var(--cream);
+      border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px;
+    }
+    .toggle-label { font-size: 13px; color: var(--ink); }
+    .toggle-switch {
+      width: 40px; height: 22px; border: 0; padding: 0; cursor: pointer;
+      border-radius: 999px; position: relative; transition: background .2s; flex-shrink: 0;
+    }
+    .toggle-thumb {
+      position: absolute; top: 2px; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+      transition: left .2s;
+    }
+
+    /* Options picker (radio-style) */
+    .options-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+    .option-btn {
+      text-align: left; padding: 11px 14px; border-radius: 9px; cursor: pointer;
+      font-family: var(--serif); font-size: 14px; color: var(--ink);
+      transition: all .15s; position: relative;
+    }
+    .option-btn.selected {
+      border: 1.5px solid var(--blue) !important;
+      background: var(--white) !important;
+      box-shadow: 0 0 0 3px rgba(105,135,168,.12);
+    }
+    .option-btn .opt-check {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      width: 16px; height: 16px; border-radius: 50%; background: var(--blue);
+      color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Callout box */
+    .callout-box {
+      background: rgba(105,135,168,.07); border: 1px solid rgba(105,135,168,.25);
+      border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+    }
+    .callout-box.amber {
+      background: rgba(185,155,80,.08); border-color: rgba(185,155,80,.3);
+    }
+    .callout-title { font-family: var(--serif); font-size: 15px; font-weight: 500;
+      color: var(--ink); margin-bottom: 6px; }
+    .callout-note { font-size: 12px; color: var(--muted); line-height: 1.65; }
+
+    /* Venue photo upload */
+    .venue-photo-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .upload-trigger {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--cream); border: 1px dashed var(--ltblue);
+      border-radius: 9px; padding: 10px 14px; cursor: pointer;
+      font-size: 13px; color: var(--muted);
+    }
+
+    /* ── BUTTONS ── */
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; background: var(--blue); color: var(--white);
+      border: none; border-radius: 10px; padding: 14px 20px;
+      font-family: var(--sans); font-size: 13px; font-weight: 400;
+      letter-spacing: .06em; cursor: pointer; transition: background .15s;
+    }
+    .btn-primary:hover { background: var(--blue-deep); }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-outline {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      background: transparent; color: var(--blue);
+      border: 1px solid var(--ltblue); border-radius: 10px; padding: 13px 20px;
+      font-family: var(--sans); font-size: 13px; cursor: pointer;
+      transition: background .15s; letter-spacing: .04em;
+    }
+    .btn-outline:hover { background: rgba(105,135,168,.06); }
+    .btn-ghost {
+      background: transparent; color: var(--muted); border: 1px solid var(--border);
+      border-radius: 8px; padding: 11px 16px; font-family: var(--sans);
+      font-size: 12.5px; cursor: pointer; letter-spacing: .04em;
+    }
+    .btn-green {
+      flex: 1; padding: 12px 16px; border-radius: 10px;
+      border: 0; background: #3a6a3a; color: #fff;
+      cursor: pointer; font-family: var(--sans); font-size: 12.5px; letter-spacing: .06em;
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--ink); color: var(--cream);
+      padding: 12px 20px; border-radius: 999px; font-family: var(--sans);
+      font-size: 12.5px; letter-spacing: .04em; z-index: 100;
+      box-shadow: 0 10px 24px -8px rgba(44,37,25,.4);
+      display: flex; align-items: center; gap: 8; max-width: 92vw;
+      animation: fadeUp .35s cubic-bezier(.22,.61,.36,1) both;
+      white-space: nowrap;
+    }
+
+    /* ── ORDER SUMMARY FOOTER ── */
+    .order-summary {
+      max-width: 560px; margin: 16px auto 0; width: 100%; padding: 0 16px 40px;
+    }
+    .summary-details {
+      background: var(--white); border: .5px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .summary-row {
+      display: flex; gap: 10px; padding: 7px 14px; font-size: 12px;
+      border-bottom: .5px solid var(--border); line-height: 1.5;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-lbl { flex-shrink: 0; width: 120px; color: var(--muted); }
+    .summary-val { color: var(--ink); word-break: break-word; }
+
+    /* ── FOOTER ── */
+    .p-footer { padding: 20px 24px 36px; text-align: center;
+      font-size: 11.5px; color: var(--muted); line-height: 1.7; }
+    .p-footer a { color: var(--blue); text-decoration: none; }
+
+    /* Checkbox group */
+    .checkbox-group { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .checkbox-row {
+      display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+      background: var(--cream); border: 1px solid var(--border);
+      border-radius: 9px; cursor: pointer; transition: all .15s;
+    }
+    .checkbox-row.checked {
+      background: var(--white); border-color: rgba(105,135,168,.4);
+    }
+    .checkbox-box {
+      width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #fff; transition: background .15s;
+    }
+    .checkbox-lbl { font-size: 13.5px; color: var(--ink); font-family: var(--serif); }
+    .checkbox-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    @media (min-width: 520px) {
+      .p-greeting { font-size: 48px; }
+      .proof-sheet { border-radius: 18px; margin-bottom: 24px; }
+      #proof-overlay { align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-logo">Ashley Triggiano</div>
+  <div class="load-ring"></div>
+</div>
+
+<div id="error">
+  <div class="e-ico">💌</div>
+  <h2>Link Not Found</h2>
+  <p id="err-msg">This portal link doesn't appear to be valid. Please contact Ashley for access.</p>
+  <a href="mailto:hello@ashleytriggiano.com">hello@ashleytriggiano.com</a>
+</div>
+
+<div id="portal">
+  <header class="p-header">
+    <span class="p-wordmark">Ashley Triggiano</span>
+    <span class="p-sub">Fine Art + Stationery</span>
+  </header>
+
+  <section class="p-welcome">
+    <h1 class="p-greeting" id="greeting">Hello!</h1>
+    <p class="p-intro">Welcome to your personalization studio — share the words and details for each piece in your order, and Ashley will bring them to life.</p>
+    <div class="date-pill" id="date-pill" style="display:none">
+      <div class="date-dot"></div>
+      <span id="date-text"></span>
+    </div>
+  </section>
+
+  <!-- Project-level proof banner -->
+  <div class="proof-banner" id="proof-banner">
+    <div class="proof-banner-inner fade-up">
+      <div class="proof-banner-bar"></div>
+      <div class="proof-banner-body">
+        <div class="eyebrow blue" id="proof-banner-eyebrow">Action needed</div>
+        <div class="proof-banner-title" id="proof-banner-title">Your proof is ready!</div>
+        <div class="proof-banner-note" id="proof-banner-note"></div>
+        <div id="proof-banner-cta"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wedding basics display card -->
+  <div class="wedding-basics-card" id="wedding-basics-card" style="display:none">
+    <div class="wbc-inner fade-up">
+      <div class="wbc-icon" id="wbc-icon"></div>
+      <div>
+        <div class="eyebrow" id="wbc-eyebrow"></div>
+        <div style="font-family:var(--serif);font-size:17px;font-weight:500;color:var(--ink);margin-top:2px;line-height:1.3" id="wbc-title"></div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px" id="wbc-sub"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress ring -->
+  <section class="progress-section" id="progress-section" style="display:none">
+    <div class="progress-card fade-up">
+      <div style="position:relative;width:64px;height:64px">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--imgbg)" stroke-width="3"/>
+          <circle id="progress-arc" cx="32" cy="32" r="26" fill="none"
+            stroke="var(--blue)" stroke-width="3" stroke-linecap="round"
+            stroke-dasharray="163.4" stroke-dashoffset="163.4"
+            transform="rotate(-90 32 32)"
+            style="transition:stroke-dashoffset .6s ease"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:18px;color:var(--ink)">
+          <span id="progress-pct">0</span><span style="font-size:10px;color:var(--muted)">%</span>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow">Your order</div>
+        <div id="progress-headline" style="font-family:var(--serif);font-size:18px;font-weight:500;color:var(--ink);margin-top:4px;line-height:1.25"></div>
+        <div id="progress-sub" style="font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.55"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Phase sections rendered here -->
+  <div id="phases"></div>
+
+  <div class="order-summary" id="order-summary" style="display:none">
+    <div class="summary-details" id="summary-details"></div>
+    <div style="margin-top:20px;text-align:center;font-size:11.5px;color:var(--muted);line-height:1.7">
+      Questions? <a href="mailto:hello@ashleytriggiano.com" style="color:var(--blue);text-decoration:none">hello@ashleytriggiano.com</a>
+    </div>
+  </div>
+
+  <footer class="p-footer">
+    <div style="font-family:var(--serif);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ashley Triggiano Fine Art + Stationery</div>
+  </footer>
+</div>
+
+<!-- Full-screen focused form view -->
+<div id="focused-view">
+  <header class="fv-header">
+    <button class="fv-back" onclick="closeFocused()">←</button>
+    <div class="fv-title-wrap">
+      <div class="eyebrow" id="fv-eyebrow">Personalization</div>
+      <div class="fv-item-title" id="fv-title"></div>
+    </div>
+    <button class="fv-save-btn" onclick="submitFocusedForm()">Save &amp; close</button>
+  </header>
+  <div class="fv-body" id="fv-body">
+    <div id="fv-preview" style="display:none;padding:18px 16px 4px;max-width:520px;margin:0 auto"></div>
+    <div class="fv-form-inner" id="fv-form"></div>
+  </div>
+  <div class="fv-footer">
+    <button class="btn-primary" id="fv-submit-btn" onclick="submitFocusedForm()">Submit my details ✓</button>
+  </div>
+</div>
+
+<!-- Proof review modal -->
+<div id="proof-overlay" onclick="closeProofModal(event)">
+  <div class="proof-sheet" onclick="event.stopPropagation()">
+    <div class="proof-handle"><span></span></div>
+    <div class="proof-head">
+      <div>
+        <div class="eyebrow blue" id="proof-modal-eyebrow">Review your proof</div>
+        <div style="font-family:var(--serif);font-size:22px;font-weight:400;margin-top:2px" id="proof-modal-title"></div>
+      </div>
+      <button class="proof-close" onclick="closeProofModal()">✕</button>
+    </div>
+    <div class="proof-body" id="proof-modal-body"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="display:none"></div>
+
+<script>
+const EDGE = 'https://kfpicwptqhufsjdoidvp.supabase.co/functions/v1/client-portal'
+
+// ── INK / FOIL / NAPKIN COLOR PALETTES ──────────────────────────────
+const INK_COLORS = [
+  { name:'Black', hex:'#0d0e0e' }, { name:'Dark gray', hex:'#646a6a' },
+  { name:'Light gray', hex:'#adb4ba' }, { name:'Taupe', hex:'#afa099' },
+  { name:'Champagne', hex:'#d4beb0' }, { name:'Chocolate', hex:'#513437' },
+  { name:'Mauve', hex:'#957b89' }, { name:'Dusty rose', hex:'#d0a2a3' },
+  { name:'Orchid 17', hex:'#cfb4b7' }, { name:'Orchid 20', hex:'#937ab8' },
+  { name:'Fuschia', hex:'#cc4f8d' }, { name:'Wine', hex:'#6f2c42' },
+  { name:'Vermillion', hex:'#b94049' }, { name:'Ginger', hex:'#a8614e' },
+  { name:'Copper', hex:'#957142' }, { name:'Gold', hex:'#bc9934' },
+  { name:'Olive', hex:'#a3b583' }, { name:'Sage', hex:'#707d61' },
+  { name:'Seafoam', hex:'#afb9b1' }, { name:'Forest', hex:'#2a613d' },
+  { name:'Steel blue', hex:'#aec0ca' }, { name:'French blue', hex:'#99b2d2' },
+  { name:'Navy', hex:'#3e4965' },
+]
+const FOIL_COLORS = [
+  { name:'Gold foil', hex:'#cdb56b', shimmer:true },
+  { name:'Rose gold foil', hex:'#e0b3a6', shimmer:true },
+  { name:'Silver foil', hex:'#d4d6d8', shimmer:true },
+  { name:'Copper foil', hex:'#c98452', shimmer:true },
+  { name:'Bronze foil', hex:'#8d7244', shimmer:true },
+  { name:'Wine foil', hex:'#9a2147', shimmer:true },
+  { name:'Red foil', hex:'#d2222b', shimmer:true },
+  { name:'Pink foil', hex:'#f3b9d3', shimmer:true },
+  { name:'Sage foil', hex:'#b4cbb1', shimmer:true },
+  { name:'Teal foil', hex:'#1aa5b4', shimmer:true },
+  { name:'Hunter foil', hex:'#138a5e', shimmer:true },
+  { name:'Forest foil', hex:'#1f6240', shimmer:true },
+  { name:'Cool blue foil', hex:'#b1d4ec', shimmer:true },
+  { name:'Blue foil', hex:'#1f6dc8', shimmer:true },
+  { name:'Royal foil', hex:'#1a2eaa', shimmer:true },
+  { name:'Naval foil', hex:'#1f3a6e', shimmer:true },
+  { name:'Violet foil', hex:'#7c4ec0', shimmer:true },
+  { name:'Passion foil', hex:'#a87fc4', shimmer:true },
+  { name:'Black matte', hex:'#1a1a1a' },
+  { name:'Black shiny', hex:'#1a1a1a', shimmer:true },
+  { name:'White matte', hex:'#f3f3f3' },
+  { name:'Ecru matte', hex:'#e8dcc1' },
+  { name:'Gold glitter', hex:'#c8a838', glitter:true },
+  { name:'Silver glitter', hex:'#cccccc', glitter:true },
+]
+const NAPKIN_COLORS_DIGITAL = [
+  { name:'White', hex:'#ffffff' }, { name:'Ecru', hex:'#ede4ce' },
+]
+const NAPKIN_COLORS_FOIL = [
+  { name:'White', hex:'#ffffff' }, { name:'Ecru', hex:'#ede4ce' },
+  { name:'Sand', hex:'#d8c79a' }, { name:'Blush', hex:'#f0c6cc' },
+  { name:'Coral', hex:'#ea8665' }, { name:'Mandarin', hex:'#e87330' },
+  { name:'Sunflower', hex:'#f1c83d' }, { name:'Fuschia', hex:'#cd4e8d' },
+  { name:'Red', hex:'#c92a2d' }, { name:'Burgundy', hex:'#6b2336' },
+  { name:'Emerald', hex:'#2d8158' }, { name:'Aqua', hex:'#86c8e0' },
+  { name:'Navy', hex:'#2b3a5b' }, { name:'Lavender', hex:'#b5a4d4' },
+  { name:'Purple', hex:'#684c98' }, { name:'Silver', hex:'#c8cad0' },
+  { name:'Grey', hex:'#9a9d9f' }, { name:'Black', hex:'#1c1c1c' },
+]
+
+// ── PHASE DEFINITIONS ────────────────────────────────────────────────
+const PHASE_DEFS = {
+  invitations: { label:'Invitations', blurb:'Save the dates, invitation suites, and everything that goes in the mail.' },
+  'day-of':    { label:'Day-of', blurb:'Signs, menus, programs — everything seen the day of your wedding.' },
+  seating:     { label:'Seating', blurb:'Place cards, escort cards, charts and table numbers — tied to your guest list.' },
+  specialty:   { label:'Specialty items', blurb:'Cocktail napkins, frosted cups, stir sticks, matchbooks and more.' },
+  keepsakes:   { label:'Keepsakes & Gifts', blurb:'Guestbook prints, vow books, and personalized keepsakes.' },
+  other:       { label:'Additional items', blurb:'' },
+}
+const PHASE_ORDER = ['invitations','day-of','seating','specialty','keepsakes','other']
+
+const TIME_ESTIMATES = {
+  paper_goods_wording:          '5 min',
+  std_wording:                  '2 min',
+  signage_wording:              '3 min',
+  guest_seating_data:           '2 min',
+  specialty_print_customization:'3 min',
+  guestbook_customization:      '4 min',
+  keepsakes_customization:      '2 min',
+  default:                      '2 min',
+}
+
+// ── FORM FIELD DEFINITIONS ───────────────────────────────────────────
+const FORMS = {
+  paper_goods_wording: [
+    { key:'couple_names', label:'Names as they should appear on the invitation', placeholder:'e.g., Sarah Elizabeth Johnson & James William Carter', type:'text', req:true },
+    { key:'wedding_date_formatted', label:'Wedding date, formatted as you\'d like it to read', placeholder:'e.g., the fifteenth of June, two thousand twenty-five', type:'text', req:true },
+    { divider:true, title:'Ceremony details' },
+    { key:'ceremony_time', label:'Ceremony time', placeholder:'e.g., four o\'clock in the afternoon', type:'text', req:true },
+    { key:'ceremony_venue', label:'Ceremony venue name', placeholder:'e.g., The Bradford', type:'text', req:true },
+    { key:'ceremony_address', label:'Ceremony address', placeholder:'Street, City, State', type:'text', req:true },
+    { key:'reception_info', label:'Reception info (if different, or "Reception to follow")', placeholder:'e.g., Reception to follow · The Ballroom at Park Lane', type:'textarea', req:false },
+    { divider:true, title:'RSVP + extras' },
+    { key:'rsvp_type', label:'RSVP type', type:'radio', req:true,
+      options:[{ val:'mail', lbl:'Traditional mail-in RSVP card' },{ val:'digital', lbl:'Digital / online RSVP' }] },
+    { key:'rsvp_deadline', label:'RSVP by date', placeholder:'e.g., May 1st', type:'text', req:false },
+    { key:'rsvp_address', label:'RSVP return address (if mail-in)', placeholder:'Full address', type:'text', req:false },
+    { key:'website_url', label:'Wedding website URL', placeholder:'e.g., sarahandjames.com', type:'text', req:false },
+    { divider:true, title:'Design preferences' },
+    { key:'ink_color', label:'Ink / text color preference', placeholder:'e.g., navy, dusty rose, black', type:'text', req:false },
+    { key:'envelope_color', label:'Envelope color preference', placeholder:'e.g., white, sage, blush', type:'text', req:false },
+    { key:'monogram', label:'Monogram or duogram initials (if applicable)', placeholder:'e.g., S & J or SJC', type:'text', req:false },
+    { divider:true },
+    { key:'custom_wording', label:'If you have wording that varies from the guide above, write it exactly as you\'d like it to appear', type:'textarea', req:false, callout:true,
+      placeholder:'Optional — write your full wording here and we\'ll use that to populate your first designs.' },
+    { key:'notes', label:'Anything else', placeholder:'Additional inserts, special wording, notes for Ashley…', type:'textarea', req:false },
+  ],
+  std_wording: [
+    { key:'couple_names', label:'Names as they should appear', placeholder:'e.g., Sarah & James', type:'text', req:true },
+    { key:'wedding_date_formatted', label:'Wedding date', placeholder:'e.g., June 15, 2025', type:'text', req:true },
+    { key:'location', label:'City & State', placeholder:'e.g., Raleigh, North Carolina', type:'text', req:true },
+    { key:'website_url', label:'Wedding website URL', placeholder:'e.g., sarahandjames.com', type:'text', req:false },
+    { key:'notes', label:'Anything else', placeholder:'Date format preferences, special wording…', type:'textarea', req:false },
+  ],
+  signage_wording: [
+    { key:'sign_text', label:'Wording for the sign(s)', placeholder:'Paste or describe the wording you\'d like…', type:'textarea', req:true },
+    { key:'size_notes', label:'Size or placement notes', placeholder:'e.g., 18×24" acrylic for ceremony entrance', type:'text', req:false },
+    { key:'notes', label:'Anything else', placeholder:'Font preferences, style notes…', type:'textarea', req:false },
+  ],
+  guest_seating_data: [
+    { key:'notes', label:'Guest list or seating notes', placeholder:'You can paste your guest list here, or let us know when you\'d like to coordinate on this…', type:'textarea', req:true },
+  ],
+  keepsakes_customization: [
+    { key:'details', label:'Personalization details', placeholder:'Names, date, any special wording…', type:'textarea', req:true },
+    { key:'notes', label:'Anything else', placeholder:'', type:'textarea', req:false },
+  ],
+  guestbook_customization: [
+    { key:'couple_names', label:'Names as they should appear on the print', placeholder:'e.g., Sarah & James or Sarah Elizabeth Johnson & James William Carter', type:'text', req:true },
+    { key:'wedding_date_formatted', label:'Wedding date, as you\'d like it to appear', placeholder:'e.g., June 15, 2025 or the fifteenth of June, two thousand twenty-five', type:'text', req:true },
+    { key:'venue_name', label:'Venue name (as it should appear on the print)', placeholder:'e.g., The Bradford Estate', type:'text', req:true },
+    { key:'venue_photo_uploads', label:'Venue photos — upload images (optional)', type:'venue_upload', req:false },
+    { key:'venue_photo_links', label:'Or paste links to venue photos', placeholder:'Google Drive, Dropbox, or image URLs — one per line', type:'textarea', req:false },
+    { key:'quote', label:'Quote or phrase (optional — leave blank if none)', placeholder:'e.g., "and so the adventure begins"', type:'textarea', req:false },
+    { divider:true, title:'Design preferences' },
+    { key:'background_color', label:'Ink color', type:'select', req:true,
+      options:['Black','Claret','Raspberry','Pink','Vintage Blush','Dusty Rose','Lavender','Dusty Blue','Ice Blue','Moss','Sand','Emerald','Lapis','Taupe','Gray','Slate','Custom (describe in notes)'] },
+    { key:'background_style', label:'Background style', type:'radio', req:true,
+      options:[{ val:'colored', lbl:'Colored background — text appears in white/cream' },{ val:'white', lbl:'White background — selected color used as ink/text color' }] },
+    { key:'font_style', label:'Font style', type:'select', req:true,
+      note:'Not sure? View the font guide at ashleytriggiano.com/product/watercolor-wedding-venue-guestbook/',
+      options:['Mozart Calligraphy','Ecatherina Calligraphy','Quita Calligraphy','Compendium Calligraphy','Antura Calligraphy','LaRoche Script','Modern Symphony Script','Dolce Vita Script','Amelie Script','Mon Voir Script','Giselle Script','Hello Paris Serif','LeGrande Serif','Hello Paris Script','Olivie Script','Boulders Beach Script','Climora Serif','Careter','LaRoche Serif','Crystal Noir','Anna Marie Calligraphy','Monseiur LaDoubase Calligraphy','The Mainsthen Script'] },
+    { divider:true },
+    { key:'notes', label:'Anything else', placeholder:'Special requests, questions for Ashley…', type:'textarea', req:false },
+  ],
+  specialty_print_customization: [
+    // Production method fork
+    { key:'print_method', label:'Print method', type:'options_field', req:true,
+      options:[
+        { val:'digital', label:'Full-color digital print', desc:'Best for watercolor art, venue illustrations, detailed designs. White or ecru napkins only.' },
+        { val:'foil', label:'Single-color foil imprint', desc:'Elegant shimmer foil in 24 colors. Available on all 18 napkin colors.' },
+        { val:'unsure', label:'Not sure yet', desc:'Leave a note below and Ashley will help you decide.' },
+      ]
+    },
+    // DIGITAL branch — shown when print_method === 'digital'
+    { key:'nap_napkin_color', label:'Napkin color', type:'color_swatches', swatches:'napkinDigital', req:false, showIf: v => v.print_method === 'digital' },
+    { key:'nap_ink_color', label:'Ink / design color', type:'color_swatches', swatches:'ink', req:false, showIf: v => v.print_method === 'digital' },
+    { key:'nap_artwork_type', label:'Artwork type', type:'options_field', req:false, showIf: v => v.print_method === 'digital',
+      options:[
+        { val:'monogram', label:'Monogram or duogram' },
+        { val:'crest', label:'Crest or seal' },
+        { val:'venue', label:'Watercolor venue illustration', note:'* Only select if you have purchased an illustration or are using existing artwork.' },
+        { val:'pet', label:'Pet portrait', note:'* Only select if you have purchased an illustration or are using existing artwork.' },
+        { val:'floral', label:'Floral / botanical motif' },
+        { val:'along-edge', label:'Along edge of printable area' },
+      ]
+    },
+    { key:'nap_placement_digital', label:'Placement', type:'options_field', req:false, showIf: v => v.print_method === 'digital',
+      options:['Centered','Corner','Along edge of printable area'].map(v=>({ val:v.toLowerCase().replace(/ /g,'-'), label:v }))
+    },
+    // FOIL branch — shown when print_method === 'foil'
+    { key:'nap_base_color', label:'Napkin color', type:'color_swatches', swatches:'napkinFoil', req:false, showIf: v => v.print_method === 'foil' },
+    { key:'nap_foil_color', label:'Foil imprint color', type:'color_swatches', swatches:'foil', req:false, showIf: v => v.print_method === 'foil' },
+    { key:'nap_artwork_foil', label:'Artwork type', type:'options_field', req:false, showIf: v => v.print_method === 'foil',
+      options:[
+        { val:'monogram', label:'Monogram or duogram' },
+        { val:'crest', label:'Crest or seal' },
+        { val:'floral', label:'Floral / botanical motif' },
+        { val:'along-edge', label:'Along edge of printable area' },
+      ]
+    },
+    { key:'nap_placement_foil', label:'Placement', type:'options_field', req:false, showIf: v => v.print_method === 'foil',
+      options:['Centered','Corner'].map(v=>({ val:v.toLowerCase(), label:v }))
+    },
+    // Shared
+    { key:'nap_text', label:'Monogram, initials, or text to print', placeholder:'e.g., S & J or "Cheers to the Wilsons"', type:'text', req:false },
+    { key:'nap_quantity', label:'Quantity', placeholder:'e.g., 200', type:'text', req:false },
+    { key:'cup_ink_color', label:'Cup ink / design color', type:'color_swatches', swatches:'ink', req:false },
+    { key:'cup_artwork_type', label:'Cup artwork type', type:'options_field', req:false,
+      options:[
+        { val:'monogram', label:'Monogram or duogram' },
+        { val:'crest', label:'Crest or seal' },
+        { val:'floral', label:'Floral / botanical motif' },
+      ]
+    },
+    { key:'cup_text', label:'Cup text or monogram', placeholder:'e.g., S & J', type:'text', req:false },
+    { key:'cup_quantity', label:'Cup quantity', placeholder:'e.g., 100', type:'text', req:false },
+    { key:'stir_foil_color', label:'Stir stick foil color', type:'color_swatches', swatches:'foil', req:false },
+    { key:'stir_text', label:'Stir stick monogram or initials', placeholder:'e.g., S & J', type:'text', req:false },
+    { key:'stir_include_date', label:'Include wedding date on stir stick?', type:'toggle', req:false },
+    { key:'stir_extra_text', label:'Additional small text (optional)', placeholder:'e.g., September 12, 2026', type:'text', req:false },
+    { key:'final_notes', label:'Anything else', placeholder:'Additional notes, special requests…', type:'textarea', req:false },
+  ],
+}
+const FORM_DEFAULT = [
+  { key:'details', label:'Details for this item', placeholder:'Names, dates, wording, preferences…', type:'textarea', req:true },
+  { key:'notes', label:'Anything else', placeholder:'', type:'textarea', req:false },
+]
+
+// ── PHASE MAPPING ────────────────────────────────────────────────────
+function getPhase(wg) {
+  const ft = (wg.form_type || '').toLowerCase()
+  const lbl = (wg.portal_label || wg.label || '').toLowerCase()
+  if (ft === 'paper_goods_wording' || ft === 'std_wording' ||
+      lbl.includes('invitation') || lbl.includes('save the date') ||
+      lbl.includes('rsvp') || lbl.includes('details card') || lbl.includes('envelope'))
+    return 'invitations'
+  if (ft === 'signage_wording' ||
+      lbl.includes('sign') || lbl.includes('program') ||
+      lbl.includes('menu') || lbl.includes('day-of') || lbl.includes('day of') ||
+      lbl.includes('ceremony') || lbl.includes('cocktail hour') || lbl.includes('bar'))
+    return 'day-of'
+  if (ft === 'guest_seating_data' ||
+      lbl.includes('seating') || lbl.includes('place card') ||
+      lbl.includes('escort') || lbl.includes('table number'))
+    return 'seating'
+  if (ft === 'guestbook_customization' || ft === 'keepsakes_customization' ||
+      lbl.includes('guestbook') || lbl.includes('guest book') ||
+      lbl.includes('keepsake') || lbl.includes('vow book'))
+    return 'keepsakes'
+  if (ft === 'specialty_print_customization' ||
+      lbl.includes('napkin') || lbl.includes('cup') ||
+      lbl.includes('stir') || lbl.includes('matchbook') ||
+      lbl.includes('decal') || lbl.includes('specialty'))
+    return 'specialty'
+  return 'other'
+}
+
+function getDesignStatus(wg) {
+  if (wg.dormant) return 'dormant'
+  const ph = wg.phase || ''
+  if (wg.proof_status === 'Approved' || ph === 'Approved') return 'approved'
+  if (['In production','Shipped','Completed','Complete'].includes(ph)) return 'in-production'
+  if (['Sent','Proofs sent'].includes(wg.proof_status) ||
+      ['Proof sent','Proofs sent','Awaiting approval','R1 sent','R2 sent'].includes(ph))
+    return 'proof-ready'
+  if (['Revision requested','R1 revision requested','Minor changes requested','Additional revision requested'].includes(wg.proof_status) ||
+      ['Revision requested','R1 revision requested'].includes(ph))
+    return 'revision-pending'
+  if (wg.form_submitted) return 'submitted'
+  return 'awaiting-details'
+}
+
+const STATUS_META = {
+  'awaiting-details': { label:'Fill out details', tone:'action', dot:true, urgent:true },
+  'in-progress':      { label:'Draft saved', tone:'progress', dot:false },
+  'submitted':        { label:'In progress with studio', tone:'progress', dot:false },
+  'revision-pending': { label:'Revision requested', tone:'progress', dot:false },
+  'proof-ready':      { label:'Proof ready — review now', tone:'review', dot:true, urgent:true },
+  'approved':         { label:'Approved', tone:'approved', dot:false },
+  'in-production':    { label:'In production', tone:'approved', dot:false },
+  'dormant':          { label:'On hold', tone:'dormant', dot:false },
+}
+
+// ── STATE ────────────────────────────────────────────────────────────
+let token = null, data = null, activeGid = null, activeWg = null
+let venuePhotoList = []
+let proofModalGid = null  // for per-item proof modal (project-level uses separate flow)
+
+// ── VENUE PHOTO UPLOAD (Cloudinary) ─────────────────────────────────
+async function uploadVenuePhotos(input) {
+  const files = Array.from(input.files)
+  const statusEl = document.getElementById('venue-upload-status')
+  for (const file of files) {
+    statusEl.textContent = 'Uploading…'
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('upload_preset', 'Ashley-studio-proofs')
+    try {
+      const res = await fetch('https://api.cloudinary.com/v1_1/dft8ujivh/upload', { method:'POST', body:fd })
+      const json = await res.json()
+      if (json.secure_url) { venuePhotoList.push(json.secure_url); renderVenuePhotoList(); statusEl.textContent = '' }
+      else { statusEl.textContent = 'Upload failed — try again' }
+    } catch { statusEl.textContent = 'Upload failed — try again' }
+  }
+  input.value = ''
+}
+function renderVenuePhotoList() {
+  const el = document.getElementById('venue-photo-list')
+  if (!el) return
+  el.innerHTML = venuePhotoList.map((url, i) =>
+    `<div style="position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1px solid var(--border);flex-shrink:0">
+      <img src="${escAttr(url)}" style="width:100%;height:100%;object-fit:cover" loading="lazy">
+      <button onclick="removeVenuePhoto(${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+    </div>`
+  ).join('')
+  const hidden = document.getElementById('ff-venue_photo_uploads')
+  if (hidden) hidden.value = venuePhotoList.join(',')
+}
+function removeVenuePhoto(i) { venuePhotoList.splice(i, 1); renderVenuePhotoList() }
+
+// ── INIT ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  token = new URLSearchParams(location.search).get('token')
+  if (!token) return showError('No portal link found. Please use the link from your email.')
+  try {
+    const res = await fetch(`${EDGE}?token=${encodeURIComponent(token)}`)
+    const json = await res.json()
+    if (!res.ok || json.error) return showError(json.error || 'Something went wrong.')
+    data = json
+    render()
+  } catch {
+    showError('Unable to load your portal. Please check your connection and try again.')
+  }
+})
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none'
+  document.getElementById('err-msg').textContent = msg
+  document.getElementById('error').style.display = 'flex'
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────
+function render() {
+  const { project, client, workflow_groups: wgs } = data
+  const name = client?.name || project.name || 'there'
+  const firstName = name.split(' ')[0]
+  document.getElementById('greeting').textContent = `Hello, ${firstName}`
+
+  const d = client?.wedding_date || project.date
+  if (d) {
+    document.getElementById('date-pill').style.display = 'inline-flex'
+    document.getElementById('date-text').textContent = fmtDate(d)
+  }
+
+  renderProofBanner(project)
+  renderWeddingBasics(project, client)
+  renderProgress(wgs || [])
+  renderPhases(wgs || [])
+  renderOrderSummary(project, wgs || [])
+
+  document.getElementById('loading').style.display = 'none'
+  document.getElementById('portal').style.display = 'flex'
+}
+
+function renderWeddingBasics(project, client) {
+  const card = document.getElementById('wedding-basics-card')
+  const icon = document.getElementById('wbc-icon')
+  const eyebrow = document.getElementById('wbc-eyebrow')
+  const title = document.getElementById('wbc-title')
+  const sub = document.getElementById('wbc-sub')
+
+  card.style.display = 'block'
+  icon.style.background = 'rgba(80,140,80,.12)'
+  icon.style.color = '#3a6a3a'
+  icon.textContent = '✓'
+  eyebrow.textContent = 'Your project'
+  eyebrow.className = 'eyebrow green'
+
+  const dateStr = (client?.wedding_date || project.date) ? fmtDate(client?.wedding_date || project.date) : ''
+  title.textContent = project.name + (dateStr ? ' · ' + dateStr : '')
+  sub.textContent = (project.service || '') + (dateStr ? '' : '')
+}
+
+function renderProgress(wgs) {
+  if (!wgs.length) return
+  const total = wgs.length
+  const submitted = wgs.filter(w => {
+    const s = getDesignStatus(w)
+    return ['submitted','proof-ready','approved','in-production','revision-pending'].includes(s)
+  }).length
+  const awaiting = wgs.filter(w => getDesignStatus(w) === 'awaiting-details').length
+
+  const pct = Math.round((submitted / total) * 100)
+  const C = 2 * Math.PI * 26
+  const off = C - (pct / 100) * C
+  document.getElementById('progress-arc').style.strokeDashoffset = off
+  document.getElementById('progress-pct').textContent = pct
+
+  const headline = awaiting > 0
+    ? `${awaiting} ${awaiting === 1 ? 'piece is' : 'pieces are'} ready for your details`
+    : submitted === total ? 'All details submitted ✓'
+    : 'Details in progress'
+  const sub = `${submitted} of ${total} complete · Fill these out at your own pace — each piece begins design once submitted.`
+  document.getElementById('progress-headline').textContent = headline
+  document.getElementById('progress-sub').textContent = sub
+  document.getElementById('progress-section').style.display = 'block'
+}
+
+function renderPhases(wgs) {
+  const container = document.getElementById('phases')
+  if (!wgs.length) {
+    // No per-item data yet — show a warm placeholder instead of a page that just stops.
+    container.innerHTML = `<div style="text-align:center;padding:34px 22px;background:var(--white);border:.5px solid var(--border);border-radius:var(--r)">
+      <div style="font-size:22px;margin-bottom:8px">✨</div>
+      <p style="margin:0 0 6px;color:var(--ink);font-size:15px;font-family:var(--serif)">Nothing to fill out just yet</p>
+      <p style="margin:0;font-size:13px;line-height:1.5;color:var(--muted)">As your order gets set up, your customization forms and proofs will appear here — and Ashley will email you the moment there's something new to review.</p>
+    </div>`
+    return
+  }
+  // Group by phase
+  const byPhase = {}
+  for (const wg of wgs) {
+    const ph = getPhase(wg)
+    if (!byPhase[ph]) byPhase[ph] = []
+    byPhase[ph].push(wg)
+  }
+
+  let html = ''
+  for (const phId of PHASE_ORDER) {
+    const items = byPhase[phId]
+    if (!items || !items.length) continue
+    const def = PHASE_DEFS[phId]
+    const awaiting = items.filter(w => getDesignStatus(w) === 'awaiting-details').length
+
+    html += `<section class="phase-section fade-up">`
+    html += `<div class="phase-header">
+      <div>
+        <div class="phase-label">${esc(def.label)} · ${items.length} ${items.length===1?'piece':'pieces'}</div>
+        ${def.blurb ? `<div class="phase-blurb">${esc(def.blurb)}</div>` : ''}
+      </div>
+      ${awaiting > 0 ? `<span class="phase-awaiting">${awaiting} awaiting</span>` : ''}
+    </div>`
+    html += `<div class="phase-cards">`
+    for (const wg of items) {
+      html += renderTaskCard(wg)
+    }
+    html += `</div></section>`
+  }
+
+  container.innerHTML = html
+}
+
+function renderTaskCard(wg) {
+  const status = getDesignStatus(wg)
+  const meta = STATUS_META[status] || STATUS_META['awaiting-details']
+  const isActionable = ['awaiting-details','proof-ready'].includes(status)
+  const isInProgress = status === 'in-progress'
+  const ft = wg.form_type || 'default'
+  const est = TIME_ESTIMATES[ft] || TIME_ESTIMATES.default
+
+  const toneMap = { action:'sp-action', progress:'sp-progress', review:'sp-review', approved:'sp-approved', dormant:'sp-dormant' }
+  const pillClass = toneMap[meta.tone] || 'sp-progress'
+  const dotHtml = meta.dot ? `<span class="status-dot" style="${meta.urgent?'animation:pulse 1.8s ease-in-out infinite':''}"></span>` : ''
+
+  const chips = (wg.items||[]).map(it => {
+    const lbl = it.product_title || it.item_type || ''
+    const qty = it.quantity > 1 ? ` ×${it.quantity}` : ''
+    return lbl ? `<span style="font-size:11px;color:var(--muted);background:var(--cream);border-radius:4px;padding:2px 7px;display:inline-block;margin-right:4px;margin-top:3px">${esc(lbl)}${qty}</span>` : ''
+  }).join('')
+
+  let footContent = ''
+  if (status === 'approved') {
+    footContent = `<div style="font-size:13px;color:#3a6a3a;padding:2px 0;display:flex;align-items:center;gap:8px"><span>✓</span> Proof approved — headed to print!</div>`
+  } else if (status === 'revision-pending') {
+    footContent = `<div style="font-size:13px;color:var(--muted);padding:2px 0">✓ Revision request received — updated proof coming soon.</div>`
+  } else if (status === 'in-production') {
+    footContent = `<div style="font-size:13px;color:#3a6a3a;padding:2px 0">In production — Ashley will be in touch when your order ships.</div>`
+  } else if (wg.dormant) {
+    footContent = `<div style="font-size:13px;color:var(--muted);line-height:1.65">${esc(wg.dormant_reason||"We'll activate this section when it's time — Ashley will be in touch!")}</div>`
+  }
+
+  return `<div class="task-card ${wg.dormant?'dormant':''}" onclick="handleCardClick(${wg.id})">
+    <div class="task-card-inner">
+      <div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-bottom:4px">
+          <span class="task-title">${esc(wg.portal_label||wg.label)}</span>
+          <span class="status-pill ${pillClass}">${dotHtml}${esc(meta.label)}</span>
+        </div>
+        ${chips ? `<div style="margin-bottom:6px">${chips}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--muted)">
+          ${isActionable ? `<span class="task-time"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width=".8" opacity=".7"/><path d="M6 3.2v3l1.8 1.4" stroke="currentColor" stroke-width=".8" stroke-linecap="round" opacity=".7"/></svg> About ${esc(est)}</span>` : ''}
+          ${status==='submitted'?'<span style="color:var(--muted)">With Ashley — design in progress</span>':''}
+        </div>
+        ${footContent ? `<div style="margin-top:8px">${footContent}</div>` : ''}
+      </div>
+      <div class="task-arrow ${isActionable?'active':'inactive'}">${isActionable?'→':'·'}</div>
+    </div>
+    ${isInProgress ? '<div class="task-progress-bar"></div>' : ''}
+  </div>`
+}
+
+function renderOrderSummary(project, wgs) {
+  if (!wgs.length) return
+  const el = document.getElementById('order-summary')
+  const details = document.getElementById('summary-details')
+  el.style.display = 'block'
+
+  const rows = [
+    project.name ? ['Client', project.name] : null,
+    (project.date || (data.client?.wedding_date)) ? ['Wedding date', fmtDate(project.date || data.client?.wedding_date)] : null,
+    project.service ? ['Service', project.service] : null,
+    project.order_number ? ['Order', project.order_number] : null,
+  ].filter(Boolean)
+
+  details.innerHTML = `
+    <div style="padding:10px 14px;background:var(--cream);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:.5px solid var(--border)">Order Summary</div>
+    ${rows.map(([l,v]) => `<div class="summary-row"><span class="summary-lbl">${esc(l)}</span><span class="summary-val">${esc(v)}</span></div>`).join('')}
+    ${wgs.map(w=>`<div class="summary-row"><span class="summary-lbl">${esc(w.portal_label||w.label)}</span><span class="summary-val" style="color:var(--muted)">${getDesignStatus(w)==='approved'?'✓ Approved':getDesignStatus(w)==='submitted'?'Submitted':getDesignStatus(w)==='awaiting-details'?'Awaiting details':'In progress'}</span></div>`).join('')}
+  `
+}
+
+// ── PROOF BANNER (project-level) ─────────────────────────────────────
+function renderProofBanner(project) {
+  const banner = document.getElementById('proof-banner')
+  const round = project.proof_round || 0
+  const status = project.proof_status || ''
+  const roundFields = ['proof_url','proof_url_r1','proof_url_r2']
+  const activeField = roundFields[Math.min(round, 2)]
+  let urlsCsv = project[activeField] || project.proof_url || ''
+  if (!urlsCsv) { banner.classList.remove('visible'); return }
+
+  const primaryUrl = urlsCsv.split(',')[0].trim()
+  banner.classList.add('visible')
+
+  const titleEl = document.getElementById('proof-banner-title')
+  const noteEl = document.getElementById('proof-banner-note')
+  const ctaEl = document.getElementById('proof-banner-cta')
+  const eyebrowEl = document.getElementById('proof-banner-eyebrow')
+
+  if (status === 'Approved') {
+    eyebrowEl.textContent = 'Approved'; eyebrowEl.className = 'eyebrow green'
+    titleEl.textContent = 'Proof Approved ✓'
+    noteEl.textContent = "You've approved this proof. Your order is headed to production!"
+    ctaEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#3a6a3a;padding:10px 14px;background:rgba(80,140,80,.08);border-radius:8px">✓ Approved — thank you! We'll be in touch when your order ships.</div>`
+    return
+  }
+  if (['Minor changes requested','Additional revision requested','Revision requested'].includes(status)) {
+    titleEl.textContent = status === 'Minor changes requested' ? 'Minor Changes Noted' : status === 'Additional revision requested' ? 'Additional Revisions Requested' : 'Revision Requested'
+    noteEl.textContent = 'Ashley has received your notes and will update your proof soon.'
+    ctaEl.innerHTML = `<div style="font-size:12px;color:#7a5f10;padding:10px 14px;background:rgba(185,155,80,.1);border-radius:8px">✏ Your changes are noted — a revised proof is on its way!</div>`
+    return
+  }
+
+  // Proof available for review
+  const titles = ['Your proof is ready!','Your revised proof is ready!','Your second revision is ready!']
+  titleEl.textContent = titles[Math.min(round, 2)]
+  noteEl.textContent = round < 2
+    ? `Please look it over carefully — check every name, date, and address. You have ${round < 1 ? 'two rounds' : 'one more round'} of revisions included.`
+    : ''
+
+  const isR2 = round >= 2
+  const proofImgHtml = urlsCsv.split(',').map(u => {
+    u = u.trim()
+    const isImg = /cloudinary\.com/.test(u) || /\.(png|jpg|jpeg|gif|webp)(\?|$)/i.test(u)
+    return isImg ? `<div style="border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:8px"><img src="${escAttr(u)}" style="width:100%;display:block;height:auto" alt="Your proof" loading="lazy"></div>` : ''
+  }).join('')
+
+  if (isR2) {
+    ctaEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">
+      ${proofImgHtml}
+      <a href="${esc(primaryUrl)}" target="_blank" class="btn-primary" style="text-decoration:none">↗ Open Proof Full Size</a>
+      <div style="background:#fef9ef;border:1px solid #f0d9a0;border-radius:8px;padding:14px;font-size:13px;line-height:1.6;color:#5a4a1a">
+        You've reached the second round of revisions included in your package. From here you can approve, request a small adjustment (no new proof), or request additional revisions at $45/hr.
+      </div>
+      <button class="btn-outline" onclick="showApproveConfirm()">✓ Approve these designs</button>
+      <button class="btn-ghost" style="width:100%" onclick="openMinorChanges()">📝 Request a small adjustment (no new proof)</button>
+      <button class="btn-ghost" style="width:100%" onclick="openBillableRevision()">⏱ Request additional revisions at $45/hr</button>
+    </div>`
+  } else {
+    ctaEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">
+      ${proofImgHtml}
+      <a href="${esc(primaryUrl)}" target="_blank" class="btn-primary" style="text-decoration:none">↗ Open Proof Full Size</a>
+      <div style="display:flex;gap:8px">
+        <button class="btn-outline" style="flex:1" onclick="showApproveConfirm()">✓ Approve</button>
+        <button class="btn-ghost" style="flex:1" onclick="openProjectRevision()">Request Changes</button>
+      </div>
+    </div>`
+  }
+}
+
+// ── CARD CLICK HANDLER ───────────────────────────────────────────────
+function handleCardClick(gid) {
+  const wg = find(gid)
+  if (!wg) return
+  const status = getDesignStatus(wg)
+  if (status === 'proof-ready') {
+    openPerItemProofModal(gid)
+  } else if (['approved','in-production','dormant'].includes(status)) {
+    // Nothing actionable
+  } else {
+    openFocusedForm(gid)
+  }
+}
+
+// ── FOCUSED FORM VIEW ────────────────────────────────────────────────
+function openFocusedForm(gid) {
+  const wg = find(gid)
+  if (!wg) return
+  activeGid = gid; activeWg = wg
+  venuePhotoList = []
+
+  // Pre-populate venuePhotoList from saved form_data if any
+  if (wg.form_data?.venue_photo_uploads) {
+    venuePhotoList = wg.form_data.venue_photo_uploads.split(',').filter(Boolean)
+  }
+
+  const label = wg.portal_label || wg.label
+  document.getElementById('fv-title').textContent = label
+  document.getElementById('fv-eyebrow').textContent = 'Personalization'
+
+  const alreadySubmitted = wg.form_submitted
+  const submitBtn = document.getElementById('fv-submit-btn')
+  submitBtn.textContent = alreadySubmitted ? 'Update my details ✓' : 'Submit my details ✓'
+  submitBtn.disabled = false
+
+  // Render form
+  const fields = FORMS[wg.form_type] || FORM_DEFAULT
+  const saved = wg.form_data || {}
+  document.getElementById('fv-form').innerHTML = renderFormFields(fields, saved)
+  if (venuePhotoList.length) renderVenuePhotoList()
+  updateLivePreview()
+
+  document.getElementById('focused-view').classList.add('open')
+  document.body.style.overflow = 'hidden'
+}
+
+function closeFocused() {
+  document.getElementById('focused-view').classList.remove('open')
+  document.body.style.overflow = ''
+  activeGid = null; activeWg = null
+}
+
+// ── LIVE STATIONERY PREVIEWS ─────────────────────────────────────────
+// Ported from the Claude Design prototype (preview.jsx): as the couple types,
+// their wording is typeset live in brand fonts above the form.
+function pvRule(color = 'var(--blue)', opacity = .55, margin = '8px auto') {
+  return `<div style="display:flex;align-items:center;justify-content:center;gap:4px;margin:${margin};opacity:${opacity}">
+    <span style="width:3px;height:3px;border-radius:50%;background:${color}"></span>
+    <span style="width:28px;height:.5px;background:${color}"></span>
+    <span style="width:3px;height:3px;border-radius:50%;background:${color}"></span></div>`
+}
+function pvFrame(inner, { ratio = '5/7', maxW = 280, label = '' } = {}) {
+  return `<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:10px">
+    <div style="background:var(--white);border:1px solid rgba(44,37,25,.08);box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 8px 28px -10px rgba(44,37,25,.18),0 2px 6px rgba(44,37,25,.06);border-radius:4px;position:relative;overflow:hidden;color:var(--ink);font-family:var(--serif);font-weight:300;width:100%;max-width:${maxW}px;aspect-ratio:${ratio};padding:12% 14%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+      <div aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 30% 10%, rgba(239,212,203,.10), transparent 60%), radial-gradient(ellipse at 80% 90%, rgba(183,203,216,.10), transparent 60%)"></div>
+      <div style="position:relative;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center">${inner}</div>
+    </div>
+    ${label ? `<div style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);opacity:.7">${label}</div>` : ''}
+  </div>`
+}
+function pvSplitCouple(s) {
+  const parts = (s || '').split(/\s*(?:&|\band\b)\s*/i).map(x => x.trim()).filter(Boolean)
+  return [parts[0] || '', parts.slice(1).join(' & ') || '']
+}
+const PREVIEW_BUILDERS = {
+  std_wording(v) {
+    const [a, b] = pvSplitCouple(v.couple_names)
+    const size = 260
+    return pvFrame(`
+      <div style="font-size:9px;letter-spacing:.35em;text-transform:uppercase;color:var(--muted);font-family:var(--sans)">Save the Date</div>
+      ${pvRule('var(--blue)', .55, '10px auto 14px')}
+      <div style="font-family:var(--script);font-size:${size*.16}px;line-height:.95;color:var(--ink);margin-bottom:6px">${esc(a) || 'Emma'}</div>
+      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.05}px;color:var(--muted);letter-spacing:.06em">&amp;</div>
+      <div style="font-family:var(--script);font-size:${size*.16}px;line-height:.95;color:var(--ink);margin-top:6px">${esc(b) || 'Jake'}</div>
+      ${pvRule('var(--blush-deep)', .8, '14px auto 10px')}
+      <div style="font-family:var(--serif);font-size:${size*.045}px;line-height:1.55;letter-spacing:.03em;color:var(--ink);max-width:85%">${esc(v.wedding_date_formatted) || 'September Twelfth, Two Thousand Twenty-Six'}</div>
+      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.04}px;color:var(--muted);margin-top:6px">${esc(v.location) || 'Asheville, North Carolina'}</div>
+      <div style="margin-top:14px;font-family:var(--sans);font-size:8px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);opacity:.75">Invitation to follow</div>
+    `, { ratio: '5/7', maxW: size, label: 'Save the Date · 5×7 — preview of your wording' })
+  },
+  paper_goods_wording(v) {
+    const [a, b] = pvSplitCouple(v.couple_names)
+    const size = 280
+    return pvFrame(`
+      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.043}px;color:var(--muted);letter-spacing:.02em">Together with their families,</div>
+      ${pvRule('var(--blue)', .55, '12px auto 10px')}
+      <div style="font-family:var(--script);font-size:${size*.105}px;line-height:1.05;color:var(--ink)">${esc(a) || 'Emma Marie Thompson'}</div>
+      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.05}px;color:var(--muted);margin:2px 0">and</div>
+      <div style="font-family:var(--script);font-size:${size*.105}px;line-height:1.05;color:var(--ink)">${esc(b) || 'Jake Andrew Whitfield'}</div>
+      ${pvRule('var(--blush-deep)', .8, '10px auto 10px')}
+      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.04}px;color:var(--ink);line-height:1.7;letter-spacing:.02em;max-width:92%">request the honor of your presence at their wedding</div>
+      <div style="margin-top:10px;font-family:var(--serif);font-size:${size*.04}px;line-height:1.6;letter-spacing:.05em;color:var(--ink)">
+        ${esc(v.wedding_date_formatted) || 'Saturday, the twelfth of September'}<br>
+        <span style="font-size:${size*.038}px;color:var(--muted)">${esc(v.ceremony_time) || 'half past four in the afternoon'}</span>
+      </div>
+      ${pvRule('var(--blue)', .55, '10px auto')}
+      <div style="font-family:var(--serif);font-size:${size*.045}px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)">${esc(v.ceremony_venue) || 'Belle Maison Estate'}</div>
+      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.038}px;color:var(--muted);margin-top:2px">${esc(v.ceremony_address) || 'Asheville, North Carolina'}</div>
+      <div style="margin-top:12px;font-family:var(--sans);font-size:8px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted)">${esc((v.reception_info || '').split('\n')[0]) || 'Dinner & dancing to follow'}</div>
+    `, { ratio: '5/7.2', maxW: size, label: 'Invitation · 5×7 — preview of your wording' })
+  },
+  signage_wording(v) {
+    const lines = (v.sign_text || '').split('\n').map(x => x.trim()).filter(Boolean)
+    const size = 240
+    return pvFrame(`
+      <div style="font-family:var(--script);font-size:${size*.22}px;line-height:.95;color:var(--ink)">${esc(lines[0]) || 'Welcome'}</div>
+      ${lines[1] ? `<div style="margin-top:14px;font-family:var(--serif);font-style:italic;font-size:${size*.055}px;color:var(--muted);letter-spacing:.03em">${esc(lines[1])}</div>` : ''}
+      ${pvRule('var(--blue)', .55, '14px auto 12px')}
+      ${lines.slice(2, 5).map(l => `<div style="font-family:var(--serif);font-size:${size*.06}px;letter-spacing:.08em;color:var(--ink);line-height:1.5">${esc(l)}</div>`).join('')}
+      ${pvRule('var(--blush-deep)', .8, '14px auto 8px')}
+    `, { ratio: '3/4', maxW: size, label: 'Sign · 18×24 — preview of your wording' })
+  },
+  guestbook_customization(v) {
+    const [a, b] = pvSplitCouple(v.couple_names)
+    const size = 260
+    return pvFrame(`
+      <div style="font-family:var(--script);font-size:${size*.13}px;line-height:1;color:var(--ink)">${esc(a) || 'Emma'}${b ? ' &amp; ' + esc(b) : ''}</div>
+      ${pvRule('var(--blue)', .55, '10px auto 8px')}
+      <div style="font-family:var(--serif);font-size:${size*.05}px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)">${esc(v.venue_name) || 'The Bradford Estate'}</div>
+      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.045}px;color:var(--muted);margin-top:4px">${esc(v.wedding_date_formatted) || 'September 12, 2026'}</div>
+      ${v.quote ? pvRule('var(--blush-deep)', .8, '12px auto 8px') + `<div style="font-family:var(--serif);font-style:italic;font-size:${size*.05}px;color:var(--muted);line-height:1.6;max-width:88%">&ldquo;${esc(v.quote)}&rdquo;</div>` : ''}
+    `, { ratio: '5/6', maxW: size, label: 'Guestbook print — preview of your wording' })
+  },
+  specialty_print_customization(v) {
+    const size = 220
+    const napColors = { white:'#fff', blush:'#efd4cb', cream:'#f0ede7', sage:'#cad8c2', slate:'#9aaab8', navy:'#2c3a52', black:'#222' }
+    const inks = { ink:'var(--ink)', gold:'#a98a4c', 'rose gold':'#b88478', blush:'var(--blush-deep)', silver:'#9aa2ab', white:'#fff', navy:'#2c3a52' }
+    const key = s => (s || '').toLowerCase().trim()
+    const bg = napColors[key(v.nap_napkin_color || v.nap_base_color)] || '#fff'
+    const ink = inks[key(v.nap_ink_color || v.nap_foil_color)] || 'var(--ink)'
+    const text = v.nap_text || v.cup_text || ''
+    const isPhrase = text.trim().split(/\s+/).length > 3
+    return `<div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:10px">
+      <div style="width:100%;max-width:${size}px;aspect-ratio:1/1;background:${bg};border:1px solid rgba(44,37,25,.12);border-radius:4px;box-shadow:0 8px 28px -10px rgba(44,37,25,.18);display:flex;align-items:center;justify-content:center;text-align:center;padding:12%">
+        ${isPhrase
+          ? `<div style="font-family:var(--serif);font-style:italic;font-size:${size*.06}px;color:${ink};line-height:1.4;max-width:80%">${esc(text)}</div>`
+          : `<div style="font-family:var(--script);font-size:${size*.24}px;line-height:.95;color:${ink}">${esc(text) || 'E &amp; J'}</div>`}
+      </div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);opacity:.7">Cocktail Napkin · 5×5 — preview</div>
+    </div>`
+  },
+}
+function updateLivePreview() {
+  const el = document.getElementById('fv-preview')
+  if (!el) return
+  const wg = activeWg
+  const builder = wg && PREVIEW_BUILDERS[wg.form_type]
+  if (!builder) { el.style.display = 'none'; el.innerHTML = ''; return }
+  const fields = (FORMS[wg.form_type] || FORM_DEFAULT).filter(f => !f.divider)
+  try { el.innerHTML = builder(collectFormData(fields)); el.style.display = 'block' }
+  catch (e) { console.error('preview error', e); el.style.display = 'none' }
+}
+// Live-update as the couple types (delegated once; covers text, radios, selects)
+document.getElementById('fv-body').addEventListener('input', updateLivePreview)
+document.getElementById('fv-body').addEventListener('change', updateLivePreview)
+
+// ── FORM FIELD RENDERING ─────────────────────────────────────────────
+function renderFormFields(fields, saved) {
+  return fields.map(f => renderField(f, saved)).join('')
+}
+
+function renderField(f, saved) {
+  if (f.divider) return `<div class="form-divider"></div>${f.title ? `<div class="form-section-title">${esc(f.title)}</div>` : ''}`
+
+  // showIf condition
+  if (f.showIf && typeof f.showIf === 'function') {
+    // We can't eval closures from serialized FORMS when re-rendering dynamically
+    // Instead, we use data-showif attribute with key=value pairs
+    // This is handled by updateConditionals() after render
+  }
+
+  const val = saved[f.key] || ''
+  const req = f.req ? '<span class="req">*</span>' : ''
+  const id = `ff-${f.key}`
+
+  if (f.type === 'color_swatches') {
+    const palettes = { ink: INK_COLORS, foil: FOIL_COLORS, napkinDigital: NAPKIN_COLORS_DIGITAL, napkinFoil: NAPKIN_COLORS_FOIL }
+    const palette = palettes[f.swatches] || INK_COLORS
+    const selectedName = val || ''
+    const swatchHtml = palette.map(c => {
+      const isLight = parseInt(c.hex.replace('#',''), 16) > 0xcccccc
+      const isSel = selectedName === c.name
+      const bg = c.glitter
+        ? `radial-gradient(${c.hex}, ${c.hex} 40%, #ffffff)`
+        : c.shimmer
+        ? `radial-gradient(circle at 35% 30%, rgba(255,255,255,.6), ${c.hex} 70%)`
+        : c.hex
+      return `<button type="button" class="swatch-btn" onclick="selectSwatch('${esc(id)}','${escAttr(c.name)}')" title="${escAttr(c.name)}">
+        <span class="swatch-circle${isLight?' light':''}${isSel?' selected':''}" style="background:${bg}" data-id="${escAttr(id)}"></span>
+        <span class="swatch-name${isSel?' selected':''}" data-label-id="${escAttr(id)}">${esc(c.name)}</span>
+      </button>`
+    }).join('')
+    const showIfAttr = f.showIf ? ` data-showif="${escAttr(f.key)}"` : ''
+    return `<div class="field"${showIfAttr} id="fw-${f.key}" data-condition="${f.showIf ? f.showIf.toString() : ''}">
+      <label class="field-lbl">${esc(f.label)}${req}</label>
+      <input type="hidden" id="${id}" value="${escAttr(selectedName)}">
+      <div class="color-swatches">${swatchHtml}</div>
+      ${selectedName ? `<div style="font-size:11.5px;color:var(--blue);font-style:italic;margin-top:4px">Selected: ${esc(selectedName)}</div>` : ''}
+    </div>`
+  }
+
+  if (f.type === 'options_field') {
+    const opts = f.options || []
+    const optHtml = opts.map(o => {
+      const oVal = typeof o === 'string' ? o : o.val
+      const oLabel = typeof o === 'string' ? o : o.label
+      const oDesc = typeof o === 'object' ? o.desc || o.description : ''
+      const oNote = typeof o === 'object' ? o.note : ''
+      const isSel = val === oVal
+      const hasDesc = !!(oDesc || oNote)
+      return `<button type="button" class="option-btn${isSel?' selected':''}"
+        style="border:${isSel?'1.5px solid var(--blue)':'1px solid var(--border)'};background:${isSel?'var(--white)':'var(--cream)'}"
+        onclick="selectOption('${escAttr(id)}', '${escAttr(oVal)}', this, '${escAttr(f.key)}')">
+        ${hasDesc ? `<span style="display:block;font-family:var(--serif);font-size:14px;color:var(--ink)">${esc(oLabel)}</span>
+          <span style="display:block;font-family:var(--sans);font-size:11.5px;color:var(--muted);margin-top:3px;font-style:italic;line-height:1.5">${esc(oDesc||oNote)}</span>`
+          : esc(oLabel)}
+        ${isSel ? '<span class="opt-check">✓</span>' : ''}
+      </button>`
+    }).join('')
+    return `<div class="field" id="fw-${f.key}">
+      <label class="field-lbl">${esc(f.label)}${req}</label>
+      <input type="hidden" id="${id}" value="${escAttr(val)}">
+      <div class="options-list">${optHtml}</div>
+    </div>`
+  }
+
+  if (f.type === 'toggle') {
+    const checked = val === true || val === 'true' || val === '1'
+    return `<div id="fw-${f.key}">
+      <div class="toggle-row">
+        <span class="toggle-label">${esc(f.label)}</span>
+        <button type="button" class="toggle-switch" style="background:${checked?'var(--blue)':'var(--ltblue)'}"
+          onclick="toggleField('${escAttr(id)}', this)">
+          <span class="toggle-thumb" style="left:${checked?'20px':'2px'}"></span>
+        </button>
+      </div>
+      <input type="hidden" id="${id}" value="${checked?'true':'false'}">
+    </div>`
+  }
+
+  if (f.type === 'radio') {
+    const optsHtml = f.options.map(o => `
+      <label class="radio-opt" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px">
+        <input type="radio" name="field-${f.key}" value="${escAttr(o.val)}" ${val===o.val?'checked':''} style="width:16px;height:16px;accent-color:var(--blue);cursor:pointer">
+        <span style="font-size:14px;color:var(--ink)">${esc(o.lbl)}</span>
+      </label>`).join('')
+    return `<div class="field" id="fw-${f.key}"><label class="field-lbl">${esc(f.label)}${req}</label>${optsHtml}</div>`
+  }
+
+  if (f.type === 'select') {
+    const opts = (f.options||[]).map(o => `<option value="${escAttr(o)}"${val===o?' selected':''}>${esc(o)}</option>`).join('')
+    const note = f.note ? `<div class="field-hint">${esc(f.note)}</div>` : ''
+    return `<div class="field" id="fw-${f.key}">
+      <label class="field-lbl" for="${id}">${esc(f.label)}${req}</label>
+      <select id="${id}"><option value="">Select…</option>${opts}</select>${note}
+    </div>`
+  }
+
+  if (f.type === 'textarea') {
+    const callout = f.callout
+    if (callout) return `<div class="callout-box amber" id="fw-${f.key}">
+      <div class="callout-title">In your own words <span style="font-size:10px;color:var(--muted);font-family:var(--sans);text-transform:uppercase;letter-spacing:.08em">Optional</span></div>
+      <div class="callout-note" style="margin-bottom:10px">${esc(f.label)}</div>
+      <textarea id="${id}" rows="5" placeholder="${escAttr(f.placeholder||'')}" style="width:100%;padding:12px;border:1px solid rgba(185,155,80,.3);border-radius:8px;font-family:var(--serif);font-size:14px;color:var(--ink);background:rgba(255,255,255,.6);outline:none;resize:vertical;line-height:1.65">${esc(val)}</textarea>
+    </div>`
+    return `<div class="field" id="fw-${f.key}">
+      <label class="field-lbl" for="${id}">${esc(f.label)}${req}</label>
+      <textarea id="${id}" rows="4" placeholder="${escAttr(f.placeholder||'')}">${esc(val)}</textarea>
+      ${f.hint ? `<div class="field-hint">${esc(f.hint)}</div>` : ''}
+    </div>`
+  }
+
+  if (f.type === 'venue_upload') {
+    return `<div class="field" id="fw-${f.key}">
+      <label class="field-lbl">${esc(f.label)}</label>
+      <div class="venue-photo-list" id="venue-photo-list"></div>
+      <label class="upload-trigger">
+        <input type="file" accept="image/*" multiple onchange="uploadVenuePhotos(this)" style="display:none">
+        ↑ Upload photos
+      </label>
+      <span id="venue-upload-status" style="font-size:12px;color:var(--muted);margin-left:8px"></span>
+      <input type="hidden" id="${id}">
+    </div>`
+  }
+
+  // Default: text input
+  return `<div class="field" id="fw-${f.key}">
+    <label class="field-lbl" for="${id}">${esc(f.label)}${req}</label>
+    <input type="text" id="${id}" value="${escAttr(val)}" placeholder="${escAttr(f.placeholder||'')}">
+  </div>`
+}
+
+// ── FORM FIELD INTERACTIONS ──────────────────────────────────────────
+function selectSwatch(hiddenId, name) {
+  document.getElementById(hiddenId).value = name
+  // Update visual state
+  document.querySelectorAll(`[data-id="${hiddenId}"]`).forEach(el => el.classList.remove('selected'))
+  document.querySelectorAll(`[data-label-id="${hiddenId}"]`).forEach(el => el.classList.remove('selected'))
+  // Find and select the right one
+  document.querySelectorAll(`.swatch-btn`).forEach(btn => {
+    const circle = btn.querySelector('.swatch-circle')
+    const label = btn.querySelector('.swatch-name')
+    if (circle && circle.dataset.id === hiddenId && btn.title === name) {
+      circle.classList.add('selected')
+      if (label) label.classList.add('selected')
+    }
+  })
+  // Also handle the options-fork: re-render conditional fields
+  updateSpecialtyConditionals()
+}
+
+function selectOption(hiddenId, val, btn, fieldKey) {
+  document.getElementById(hiddenId).value = val
+  // Update sibling buttons
+  const parent = btn.parentElement
+  parent.querySelectorAll('.option-btn').forEach(b => {
+    b.classList.remove('selected')
+    b.style.border = '1px solid var(--border)'
+    b.style.background = 'var(--cream)'
+    const chk = b.querySelector('.opt-check')
+    if (chk) chk.remove()
+  })
+  btn.classList.add('selected')
+  btn.style.border = '1.5px solid var(--blue)'
+  btn.style.background = 'var(--white)'
+  if (!btn.querySelector('.opt-check')) {
+    const chk = document.createElement('span')
+    chk.className = 'opt-check'; chk.textContent = '✓'
+    btn.appendChild(chk)
+  }
+  // If this is the print_method selector, update conditional fields
+  if (fieldKey === 'print_method') updateSpecialtyConditionals()
+}
+
+function toggleField(hiddenId, btn) {
+  const hidden = document.getElementById(hiddenId)
+  const current = hidden.value === 'true'
+  const next = !current
+  hidden.value = next ? 'true' : 'false'
+  btn.style.background = next ? 'var(--blue)' : 'var(--ltblue)'
+  const thumb = btn.querySelector('.toggle-thumb')
+  if (thumb) thumb.style.left = next ? '20px' : '2px'
+}
+
+function updateSpecialtyConditionals() {
+  if (!activeWg || activeWg.form_type !== 'specialty_print_customization') return
+  const methodHidden = document.getElementById('ff-print_method')
+  const method = methodHidden ? methodHidden.value : ''
+  const fields = FORMS['specialty_print_customization']
+  fields.forEach(f => {
+    if (!f.showIf) return
+    const wrap = document.getElementById('fw-' + f.key)
+    if (!wrap) return
+    const allVals = collectFormData(FORMS['specialty_print_customization'])
+    const show = f.showIf(allVals)
+    wrap.style.display = show ? 'block' : 'none'
+  })
+}
+
+// ── FORM SUBMISSION ───────────────────────────────────────────────────
+async function submitFocusedForm() {
+  const wg = find(activeGid)
+  if (!wg) return
+  const fields = (FORMS[wg.form_type] || FORM_DEFAULT).filter(f => !f.divider)
+  const fd = collectFormData(fields)
+
+  // Validate required fields
+  let hasError = false
+  fields.forEach(f => {
+    if (!f.req) return
+    const wrap = document.getElementById('fw-' + f.key)
+    if (wrap && wrap.style.display === 'none') return // hidden conditional
+    const el = document.getElementById('ff-' + f.key)
+    if (f.type === 'radio') {
+      const sel = document.querySelector(`input[name="field-${f.key}"]:checked`)
+      if (!sel) { if (wrap) wrap.style.border = '1px solid #c0392b'; hasError = true }
+      else if (wrap) wrap.style.border = ''
+    } else if (!fd[f.key] && fd[f.key] !== false) {
+      if (wrap) wrap.classList.add('error'); hasError = true
+    } else {
+      if (wrap) wrap.classList.remove('error')
+    }
+  })
+  if (hasError) return
+
+  const btn = document.getElementById('fv-submit-btn')
+  btn.textContent = 'Submitting…'; btn.disabled = true
+
+  // Handle radio fields specially
+  fields.forEach(f => {
+    if (f.type === 'radio') {
+      const sel = document.querySelector(`input[name="field-${f.key}"]:checked`)
+      if (sel) fd[f.key] = sel.value
+    }
+  })
+
+  try {
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=submit-form&group_id=${activeGid}`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ form_data: fd }) })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      btn.textContent = wg.form_submitted ? 'Update my details ✓' : 'Submit my details ✓'
+      btn.disabled = false
+      showToast('Something went wrong. Please try again.')
+      return
+    }
+    // Update local state
+    const wgLocal = find(activeGid)
+    if (wgLocal) {
+      wgLocal.form_submitted = true
+      wgLocal.form_data = fd
+      wgLocal.phase = 'Wording received'
+    }
+    const label = wg.portal_label || wg.label
+    closeFocused()
+    renderPhases(data.workflow_groups || [])
+    renderProgress(data.workflow_groups || [])
+    showToast(`${label} details sent to Ashley ✓`)
+  } catch {
+    btn.textContent = wg.form_submitted ? 'Update my details ✓' : 'Submit my details ✓'
+    btn.disabled = false
+    showToast('Connection issue. Please try again.')
+  }
+}
+
+function collectFormData(fields) {
+  const fd = {}
+  fields.filter(f => !f.divider).forEach(f => {
+    if (f.type === 'radio') {
+      const sel = document.querySelector(`input[name="field-${f.key}"]:checked`)
+      if (sel) fd[f.key] = sel.value
+    } else {
+      const el = document.getElementById('ff-' + f.key)
+      if (el) fd[f.key] = el.value?.trim() || el.value || ''
+    }
+  })
+  return fd
+}
+
+// ── PER-ITEM PROOF MODAL ─────────────────────────────────────────────
+function openPerItemProofModal(gid) {
+  const wg = find(gid)
+  if (!wg) return
+  proofModalGid = gid
+  const label = wg.portal_label || wg.label
+  document.getElementById('proof-modal-title').textContent = `Review your ${label.toLowerCase()}`
+  renderProofModalBody('review', wg)
+  document.getElementById('proof-overlay').classList.add('open')
+  document.body.style.overflow = 'hidden'
+}
+
+function closeProofModal(e) {
+  if (e && e.target !== document.getElementById('proof-overlay')) return
+  document.getElementById('proof-overlay').classList.remove('open')
+  document.body.style.overflow = ''
+  proofModalGid = null
+}
+
+function renderProofModalBody(mode, wg) {
+  const body = document.getElementById('proof-modal-body')
+  const eyebrow = document.getElementById('proof-modal-eyebrow')
+
+  if (mode === 'review') {
+    // Per-item rounds aren't tracked as a number — derive a friendly label from status.
+    const st = wg?.proof_status || ''
+    eyebrow.textContent = /R2/.test(st) ? 'Final proof' : /R1/.test(st) ? 'Revised proof' : 'Your proof'
+    const proofLink = wg?.proof_link || ''
+    // proof_link may hold several comma-separated Cloudinary URLs; render images inline.
+    const urls = proofLink.split(',').map(u => u.trim()).filter(Boolean)
+    const isImg = u => /\.(png|jpe?g|gif|webp)(\?|$)/i.test(u) || /cloudinary/.test(u)
+    const gallery = urls.filter(isImg).map(u =>
+      `<a href="${escAttr(u)}" target="_blank" style="display:block"><img src="${escAttr(u)}" alt="Your proof" style="width:100%;border-radius:8px;border:.5px solid var(--border);display:block"/></a>`).join('')
+    const extLinks = urls.filter(u => !isImg(u))
+    body.innerHTML = `
+      <div style="background:var(--white);border-radius:10px;padding:${gallery ? '14px' : '28px 20px'};display:flex;flex-direction:column;align-items:center;gap:10px;border:1px ${gallery ? 'solid var(--border)' : 'dashed rgba(44,37,25,.18)'};text-align:center;margin-bottom:16px">
+        ${gallery || `<div style="font-size:28px;color:var(--muted);opacity:.6">↗</div>
+        <div style="font-family:var(--serif);font-size:16px;color:var(--ink)">Your proof</div>
+        <div style="font-size:12.5px;color:var(--muted);max-width:280px;line-height:1.6">Open the high-resolution proof Ashley shared to review carefully on the largest screen you have.</div>`}
+        ${extLinks.map(u => `<a href="${escAttr(u)}" target="_blank" style="margin-top:6px;padding:10px 18px;background:var(--blue);color:#fff;border-radius:8px;font-size:12px;letter-spacing:.05em;text-decoration:none">Open proof ↗</a>`).join('')}
+        ${!urls.length ? '<div style="font-size:12.5px;color:var(--muted)">Proof link coming from Ashley — check your email.</div>' : ''}
+        ${gallery ? '<div style="font-size:11.5px;color:var(--muted)">Tap an image to open it full size.</div>' : ''}
+      </div>
+      <div style="background:rgba(185,155,80,.1);border-left:2px solid rgba(185,155,80,.35);padding:12px 14px;border-radius:6px;font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:16px">
+        <strong style="color:#7a5f10;font-weight:500">A note from Ashley:</strong> Take your time — check every name, date, and address. Two rounds of revisions are included.
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="renderProofModalBody('confirm', null)" style="flex:1;padding:14px 16px;background:var(--ink);color:var(--cream);border:0;border-radius:10px;font-family:var(--sans);font-size:12.5px;letter-spacing:.06em;cursor:pointer">Approve proof</button>
+        <button onclick="renderProofModalBody('revise', null)" style="flex:1;padding:14px 16px;background:transparent;color:var(--blue);border:1px solid var(--ltblue);border-radius:10px;font-family:var(--sans);font-size:12.5px;letter-spacing:.06em;cursor:pointer">Request changes</button>
+      </div>`
+  }
+
+  if (mode === 'confirm') {
+    eyebrow.textContent = 'Ready to approve?'
+    body.innerHTML = `
+      <div style="background:rgba(80,140,80,.08);border:1px solid rgba(80,140,80,.3);border-radius:12px;padding:22px;text-align:center">
+        <div style="font-size:24px;margin-bottom:10px">✓</div>
+        <div style="font-family:var(--serif);font-size:22px;font-weight:500;color:#2e5a2e;margin-bottom:8px">Ready to approve?</div>
+        <p style="font-size:13px;color:#2e5a2e;line-height:1.7;margin-bottom:16px;opacity:.85">Once approved, your proof goes to print and changes are no longer possible. Please make sure every name, date, and detail is correct.</p>
+        <div style="display:flex;gap:10px">
+          <button onclick="renderProofModalBody('review', find(proofModalGid))" style="flex:1;padding:12px 16px;border-radius:10px;border:1px solid var(--border);background:var(--white);color:var(--muted);cursor:pointer;font-family:var(--sans);font-size:12.5px">Wait, let me check again</button>
+          <button class="btn-green" onclick="approvePerItemProof()">Yes, send to print</button>
+        </div>
+      </div>`
+  }
+
+  if (mode === 'revise') {
+    eyebrow.textContent = 'Request changes'
+    body.innerHTML = `
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">Let Ashley know what you'd like adjusted — the more specific, the faster your revised proof will come back.</p>
+      <textarea id="per-item-rev-notes" rows="6" placeholder="e.g., Please change the ceremony time to 5:00 PM and adjust the spacing under our names…"
+        style="width:100%;padding:14px;font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--white);border:1px solid var(--border);border-radius:10px;outline:none;min-height:140px;resize:vertical;line-height:1.6"></textarea>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button onclick="renderProofModalBody('review', find(proofModalGid))" style="padding:12px 18px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--sans);font-size:12.5px">← Back</button>
+        <button onclick="submitPerItemRevision()" style="flex:1;padding:12px 16px;border-radius:10px;border:0;background:var(--blue);color:#fff;cursor:pointer;font-family:var(--sans);font-size:12.5px;letter-spacing:.06em">Send to Ashley</button>
+      </div>`
+  }
+}
+
+async function approvePerItemProof() {
+  const btn = event?.target
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Sending…' }
+  try {
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=approve-proof&group_id=${proofModalGid}`, { method:'POST' })
+    const json = await res.json()
+    if (!res.ok || json.error) { showToast('Something went wrong. Please contact Ashley.'); if (btn) { btn.disabled = false; btn.textContent = 'Yes, send to print' } return }
+    const wg = find(proofModalGid)
+    if (wg) { wg.proof_status = 'Approved'; wg.phase = 'Approved' }
+    document.getElementById('proof-overlay').classList.remove('open')
+    document.body.style.overflow = ''
+    renderPhases(data.workflow_groups || [])
+    showToast('Proof approved — headed to print 🎉')
+  } catch { showToast('Connection issue. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = 'Yes, send to print' } }
+}
+
+async function submitPerItemRevision() {
+  const notes = document.getElementById('per-item-rev-notes')?.value?.trim()
+  if (!notes) { showToast('Please add a note describing the changes first.'); return }
+  const btn = event?.target
+  if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Sending…' }
+  try {
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=request-revision&group_id=${proofModalGid}`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes }) })
+    const json = await res.json()
+    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = 'Send to Ashley' } return }
+    const wg = find(proofModalGid)
+    if (wg) { wg.proof_status = 'Revision requested'; wg.phase = 'Revision requested' }
+    document.getElementById('proof-overlay').classList.remove('open')
+    document.body.style.overflow = ''
+    renderPhases(data.workflow_groups || [])
+    showToast('Revision request sent to Ashley ✓')
+  } catch { showToast('Connection issue. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = 'Send to Ashley' } }
+}
+
+// ── PROJECT-LEVEL PROOF ACTIONS ──────────────────────────────────────
+function showApproveConfirm() {
+  const cta = document.getElementById('proof-banner-cta')
+  cta.innerHTML = `
+    <div style="background:rgba(80,140,80,.08);border:1px solid rgba(80,140,80,.3);border-radius:10px;padding:16px;text-align:center">
+      <p style="font-size:13px;color:#2e5a2e;line-height:1.6;margin-bottom:12px">Once approved, your order will go to print. Please make sure everything looks perfect!</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn-outline" style="flex:1" onclick="approveProjectProof()">Yes, approve</button>
+        <button class="btn-ghost" style="flex:1" onclick="renderProofBanner(data.project)">Go back</button>
+      </div>
+    </div>`
+}
+
+async function approveProjectProof() {
+  try {
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=approve-project-proof`, { method:'POST' })
+    const json = await res.json()
+    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); return }
+    data.project.proof_status = 'Approved'
+    renderProofBanner(data.project)
+    showToast('Proof approved — headed to production 🎉')
+  } catch { showToast('Connection issue. Please try again.') }
+}
+
+function openProjectRevision() {
+  // Reuse proof banner area to show revision textarea
+  const cta = document.getElementById('proof-banner-cta')
+  cta.innerHTML = `
+    <div>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:10px">Let Ashley know what you'd like adjusted.</p>
+      <textarea id="project-rev-notes" rows="4" placeholder="e.g., Please change the ceremony time to 5:00 PM…"
+        style="width:100%;padding:12px;font-family:var(--sans);font-size:13px;color:var(--ink);background:var(--white);border:1px solid var(--border);border-radius:9px;outline:none;resize:vertical;line-height:1.6;margin-bottom:10px"></textarea>
+      <div style="display:flex;gap:8px">
+        <button class="btn-primary" style="flex:1" onclick="submitProjectRevision()">Send revision request</button>
+        <button class="btn-ghost" onclick="renderProofBanner(data.project)">Cancel</button>
+      </div>
+    </div>`
+}
+
+async function submitProjectRevision() {
+  const notes = document.getElementById('project-rev-notes')?.value?.trim()
+  if (!notes) return
+  try {
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=request-project-revision`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes }) })
+    const json = await res.json()
+    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); return }
+    data.project.proof_status = 'Revision requested'
+    renderProofBanner(data.project)
+    showToast('Revision request sent to Ashley ✓')
+  } catch { showToast('Connection issue. Please try again.') }
+}
+
+function openMinorChanges() {
+  const cta = document.getElementById('proof-banner-cta')
+  cta.innerHTML = `
+    <div>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:10px">Describe the small adjustment — Ashley will make it without a new proof round.</p>
+      <textarea id="minor-notes" rows="3" placeholder="e.g., Please change the ceremony time to 5:00 PM"
+        style="width:100%;padding:12px;font-family:var(--sans);font-size:13px;color:var(--ink);background:var(--white);border:1px solid var(--border);border-radius:9px;outline:none;resize:vertical;line-height:1.6;margin-bottom:10px"></textarea>
+      <div style="display:flex;gap:8px">
+        <button class="btn-primary" style="flex:1" onclick="submitMinorChanges()">Send request</button>
+        <button class="btn-ghost" onclick="renderProofBanner(data.project)">Cancel</button>
+      </div>
+    </div>`
+}
+
+async function submitMinorChanges() {
+  const notes = document.getElementById('minor-notes')?.value?.trim()
+  if (!notes) return
+  try {
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=request-minor-changes`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes }) })
+    const json = await res.json()
+    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); return }
+    data.project.proof_status = 'Minor changes requested'
+    renderProofBanner(data.project)
+    showToast('Adjustment request sent ✓')
+  } catch { showToast('Connection issue. Please try again.') }
+}
+
+function openBillableRevision() {
+  const cta = document.getElementById('proof-banner-cta')
+  cta.innerHTML = `
+    <div>
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:10px">Additional revisions are billed at $45/hr. Ashley will estimate the time before making any changes.</p>
+      <textarea id="billable-notes" rows="4" placeholder="Describe what you'd like adjusted…"
+        style="width:100%;padding:12px;font-family:var(--sans);font-size:13px;color:var(--ink);background:var(--white);border:1px solid var(--border);border-radius:9px;outline:none;resize:vertical;line-height:1.6;margin-bottom:10px"></textarea>
+      <div style="display:flex;gap:8px">
+        <button class="btn-primary" style="flex:1" onclick="submitBillableRevision()">Send request ($45/hr)</button>
+        <button class="btn-ghost" onclick="renderProofBanner(data.project)">Cancel</button>
+      </div>
+    </div>`
+}
+
+async function submitBillableRevision() {
+  const notes = document.getElementById('billable-notes')?.value?.trim()
+  if (!notes) return
+  try {
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=request-billable-revision`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes }) })
+    const json = await res.json()
+    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); return }
+    data.project.proof_status = 'Additional revision requested'
+    renderProofBanner(data.project)
+    showToast('Additional revision request sent ✓')
+  } catch { showToast('Connection issue. Please try again.') }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+let toastTimer = null
+function showToast(msg) {
+  const el = document.getElementById('toast')
+  el.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:#a6c89c;flex-shrink:0"></span> ${esc(msg)}`
+  el.style.display = 'flex'
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { el.style.display = 'none' }, 3500)
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────
+function find(gid) { return (data?.workflow_groups||[]).find(w => w.id === gid) }
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+function escAttr(s) { return esc(s).replace(/'/g,'&#39;') }
+function enc(s) { return encodeURIComponent(s) }
+function fmtDate(d) {
+  if (!d) return ''
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+}
+</script>
+</body>
+</html>

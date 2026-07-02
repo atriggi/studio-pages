@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<!-- ashley-studio-command-center-v10.html
+  Changelog:
+  v10 — Multi-round proof system (up to 5 images per round, comma-separated Cloudinary URLs).
+        Proof section: image list UI (upload or paste URL, max 5, removable thumbnails).
+        sendProof() saves to round-correct field: proof_url / proof_url_r1 / proof_url_r2.
+        Round history shown as collapsed summaries above active round in edit modal.
+        New proof_status values: Initial design sent, R1 sent, R1 revision requested,
+          R2 sent, Minor changes requested, Additional revision requested.
+        Daily brief + sidebar "awaiting Ashley" now includes R1 revision requested
+          and Additional revision requested.
+
+  v9 — Cloudinary proof upload button (cloud: dft8ujivh, preset: Ashley-studio-proofs).
+
+  v8 — Added daily brief panel (collapsible, above kanban): phase changes in 24h,
+       stale projects > 3 days, pending client responses, 'Needs follow-up' phase flags.
+       Added magic link sender modal.
+       Kanban cards now show "No portal" badge when magic_token is missing.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio Command Center v11 — Ashley Triggiano Fine Art + Stationery</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f6f3;color:#1a1a1a;min-height:100vh;padding:2rem 1.5rem}
+:root{--brand:#6987a8;--brand-dark:#4a6580;--surface:#fff;--border:#e0dbd4;--border-soft:#ede9e4;--text:#1a1a1a;--text-2:#5a5751;--text-3:#9a958f;--radius:8px;--radius-lg:12px}
+.pill{display:inline-block;font-size:11px;font-weight:500;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.s-booked{background:#eeedfe;color:#534ab7}.s-questionnaire{background:#e6f1fb;color:#185fa5}.s-awaiting-wording{background:#fff3e0;color:#854f0b}.s-design{background:#eef2f7;color:#4a6580}.s-proofs{background:#faeeda;color:#633806}.s-awaiting-approval{background:#fbeaf0;color:#993556}.s-production{background:#e8f0e0;color:#3b6d11}.s-shipped{background:#e1f5ee;color:#085041}.s-complete{background:#d3d1c7;color:#444441}.s-dormant{background:#f1efe8;color:#888780}
+.flag-hot{background:#fcebeb;color:#a32d2d;border:0.5px solid #f09595}.flag-ok{background:#eaf3de;color:#27500a}.flag-info{background:#e6f1fb;color:#185fa5;border:0.5px solid #85b7eb}
+.wg-invitations{background:#eeedfe;color:#534ab7}.wg-save_the_dates{background:#e6f1fb;color:#185fa5}.wg-printed_day_of{background:#e8f0e0;color:#3b6d11}.wg-seating{background:#faeeda;color:#633806}.wg-drinkware_napkins{background:#fbeaf0;color:#993556}.wg-keepsakes{background:#f0ede7;color:#5f5e5a}.wg-custom_artwork{background:#efd4cb;color:#712b13}.wg-custom{background:#eef2f7;color:#4a6580}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
+.metric{background:#f0ede7;border-radius:var(--radius);padding:12px 16px}
+.metric-label{font-size:11px;color:var(--text-2);margin-bottom:4px;font-weight:500;letter-spacing:.04em}
+.metric-val{font-size:24px;font-weight:500}
+.btn{padding:7px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn-primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn-primary:hover{background:var(--brand-dark);color:#fff;border-color:var(--brand-dark)}
+.btn-sm{padding:4px 11px;font-size:12px}.btn-active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn-danger{border-color:#f09595;color:#a32d2d}.btn-danger:hover{background:#fcebeb}
+input,select,textarea{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;padding:7px 10px;transition:border-color .15s;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--brand)}
+.form-row{margin-bottom:12px}
+.form-row label{display:block;font-size:12px;color:var(--text-2);margin-bottom:4px;font-weight:500}
+.form-row input,.form-row select,.form-row textarea{width:100%}
+.form-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:820px}
+th{font-size:11px;font-weight:500;color:var(--text-3);text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;letter-spacing:.04em}
+td{padding:10px 12px;border-bottom:1px solid var(--border-soft);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf9}
+.toggle{position:relative;width:30px;height:17px;display:inline-block;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.t-slider{position:absolute;inset:0;background:#d3d1c7;border-radius:9px;cursor:pointer;transition:.2s}
+.t-slider:before{content:"";position:absolute;width:13px;height:13px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s}
+input:checked+.t-slider{background:var(--brand)}
+input:checked+.t-slider:before{transform:translateX(13px)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:flex-start;justify-content:center;padding:3rem 1rem;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);width:100%;max-width:580px;padding:1.5rem}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem}
+.modal-title{font-size:15px;font-weight:500}
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filter-bar select,.filter-bar input{padding:6px 10px;font-size:12px}
+.top-bar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem}
+.brand-bar{height:3px;background:linear-gradient(90deg,#efd4cb,#6987a8);margin:-1.5rem -1.5rem 1.25rem;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.footer{text-align:center;font-size:11px;color:var(--text-3);margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border-soft)}
+.toast{position:fixed;bottom:2rem;right:2rem;background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:var(--radius);font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#1d9e75;display:inline-block;margin-right:6px}
+.sync-dot.syncing{background:#f5c842;animation:pulse 1s infinite}
+.sync-dot.error{background:#a32d2d}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.phase-timer{font-size:11px;font-weight:500;padding:2px 8px;border-radius:12px;background:#eef2f7;color:#4a6580;border:0.5px solid #b5d4f4;display:inline-block;white-space:nowrap}
+.phase-timer-warn{background:#fbeaf0;color:#993556;border-color:#f4c0d1}
+.stale-warn{font-size:10px;font-weight:500;padding:2px 8px;border-radius:12px;background:#fbeaf0;color:#993556;border:0.5px solid #f4c0d1;display:inline-block;white-space:nowrap;margin-top:3px}
+.kanban-wrap{display:flex;gap:12px;overflow-x:auto;padding-bottom:1rem;align-items:flex-start}
+.kanban-col{background:#f0ede7;border-radius:var(--radius-lg);padding:10px;min-width:210px;max-width:210px;flex-shrink:0}
+.kanban-col-title{font-size:11px;font-weight:500;letter-spacing:.06em;color:var(--text-3);text-transform:uppercase;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:7px;cursor:grab;transition:border-color .15s,opacity .15s,box-shadow .15s}
+.kanban-card:hover{border-color:var(--brand)}
+.kanban-card:active{cursor:grabbing}
+.kanban-card.dragging{opacity:.35;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.kanban-card.dormant-card{opacity:.55;border-style:dashed;cursor:pointer}
+.kanban-col.drag-over{background:rgba(105,135,168,.14);outline:2px dashed var(--brand);outline-offset:-3px}
+.kanban-card:last-child{margin-bottom:0}
+.item-line{font-size:11px;color:var(--text-2);padding:3px 0;border-bottom:0.5px solid var(--border-soft);display:flex;justify-content:space-between}
+.item-line:last-child{border-bottom:none}
+.dormant-section{margin-top:1.5rem}
+.dormant-section-title{font-size:11px;font-weight:500;letter-spacing:.07em;color:var(--text-3);text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border-soft)}
+.dormant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.section-label{font-size:11px;font-weight:500;letter-spacing:.07em;color:var(--text-3);text-transform:uppercase;margin-bottom:8px}
+/* proof image list */
+.proof-img-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f8f6f3;border:1px solid var(--border-soft);border-radius:var(--radius);margin-bottom:5px}
+.proof-img-thumb{width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid var(--border);flex-shrink:0}
+.proof-img-pdf{width:38px;height:38px;background:#f0ede7;border-radius:4px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-3);flex-shrink:0}
+/* sidebar */
+.main-layout{display:flex;gap:16px;align-items:flex-start}
+.main-content{flex:1;min-width:0}
+.sidebar-wrap{width:252px;flex-shrink:0;position:sticky;top:24px}
+.sidebar-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px}
+.sidebar-title{font-size:11px;font-weight:500;letter-spacing:.07em;color:var(--text-3);text-transform:uppercase;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.sidebar-count{background:var(--brand);color:#fff;border-radius:10px;font-size:10px;padding:1px 7px;font-weight:500;letter-spacing:0}
+.sidebar-item{border-radius:var(--radius);padding:9px 10px;margin-bottom:7px;border:0.5px solid;cursor:pointer;transition:opacity .15s}
+.sidebar-item:last-child{margin-bottom:0}
+.sidebar-item:hover{opacity:.8}
+.si-high{background:#fbeaf0;border-color:#f4c0d1}.si-medium{background:#e6f1fb;border-color:#85b7eb}
+.si-low{background:#fff8ee;border-color:#f5d89a}.si-flag{background:#fcebeb;border-color:#f09595}
+.si-name{font-size:12px;font-weight:500;color:var(--text);line-height:1.3;margin-bottom:2px}
+.si-action{font-size:11px;font-weight:500}
+.si-action-high{color:#993556}.si-action-medium{color:#185fa5}.si-action-low{color:#854f0b}.si-action-flag{color:#a32d2d}
+.si-meta{font-size:10px;color:var(--text-3);margin-top:1px}
+.si-note{font-size:11px;color:var(--text-2);font-style:italic;margin-top:3px;line-height:1.4}
+.sidebar-empty{text-align:center;padding:18px 0}
+@media(max-width:960px){.main-layout{flex-direction:column}.sidebar-wrap{width:100%;position:static}}
+/* daily brief */
+.brief-wrap{margin-bottom:1.25rem}
+.brief-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);transition:border-color .15s;user-select:none}
+.brief-header:hover{border-color:var(--brand)}
+.brief-header-left{display:flex;align-items:center;gap:10px}
+.brief-dot{width:8px;height:8px;border-radius:50%;background:#e8843a;flex-shrink:0}
+.brief-dot.quiet{background:#1d9e75}
+.brief-title{font-size:13px;font-weight:500}
+.brief-subtitle{font-size:12px;color:var(--text-3)}
+.brief-chevron{font-size:11px;color:var(--text-3);transition:transform .2s}
+.brief-chevron.open{transform:rotate(180deg)}
+.brief-body{background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);padding:14px;display:none}
+.brief-body.open{display:block}
+.brief-section{margin-bottom:14px}.brief-section:last-child{margin-bottom:0}
+.brief-section-title{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px}
+.brief-row{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;font-size:12px;gap:8px;margin-bottom:4px}
+.brief-row:last-child{margin-bottom:0}
+.brief-row.action{background:#fbeaf0;border:0.5px solid #f4c0d1}
+.brief-row.warn{background:#fff8ee;border:0.5px solid #f5d89a}
+.brief-row.neutral{background:#f0ede7}
+.brief-row.flag{background:#fcebeb;border:0.5px solid #f09595}
+.brief-name{font-weight:500;color:var(--text)}
+.brief-meta{font-size:11px;color:var(--text-3);white-space:nowrap;flex-shrink:0}
+.brief-empty{font-size:12px;color:var(--text-3);padding:6px 8px}
+@media(max-width:600px){.metrics-grid{grid-template-columns:1fr 1fr}.form-2col{grid-template-columns:1fr}}
+
+/* ── v11: tabs, focus, delete confirm ── */
+.modal-tabs{display:flex;border-bottom:1px solid var(--border);margin:0 -1.5rem 1.25rem;padding:0 1.5rem;}
+.modal-tab{padding:9px 16px;font-size:13px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-2);font-family:inherit;transition:all .15s;margin-bottom:-1px;}
+.modal-tab:hover{color:var(--text);}
+.modal-tab.active{color:var(--brand);border-bottom-color:var(--brand);font-weight:500;}
+.edit-panel{display:none;}
+.edit-panel.active{display:block;}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--brand);outline-offset:1px;}
+.delete-confirm-box{background:#fcebeb;border:0.5px solid #f09595;border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;display:none;}
+.delete-confirm-box.open{display:block;}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div>
+    <p style="font-size:20px;font-weight:500">Studio command center</p>
+    <p style="font-size:13px;color:var(--text-2);margin-top:2px">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-status">Connecting...</span>
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" onclick="openPortalLinkModal()">✉ Send portal link</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add project</button>
+  </div>
+</div>
+
+<div class="metrics-grid" id="metrics-row"></div>
+
+<!-- Daily brief -->
+<div class="brief-wrap" id="brief-wrap">
+  <div class="brief-header" onclick="toggleBrief()">
+    <div class="brief-header-left">
+      <div class="brief-dot" id="brief-dot"></div>
+      <div>
+        <div class="brief-title">Today's brief</div>
+        <div class="brief-subtitle" id="brief-subtitle">Loading...</div>
+      </div>
+    </div>
+    <span class="brief-chevron" id="brief-chevron">▼</span>
+  </div>
+  <div class="brief-body" id="brief-body"></div>
+</div>
+
+<div class="main-layout">
+<div class="main-content">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
+  <div class="filter-bar">
+    <input id="filter-client" placeholder="Filter by client..." style="min-width:160px" oninput="renderAll()"/>
+    <select id="filter-phase" onchange="renderAll()">
+      <option value="">All phases</option>
+      <option>Onboarding</option><option>In design</option><option>In client's court</option>
+      <option>In production</option><option>Shipped</option><option>Completed</option>
+      <option>Dormant</option><option>On hold</option><option>Needs follow-up</option>
+    </select>
+    <select id="filter-wg" onchange="renderAll()">
+      <option value="">All workflow groups</option>
+      <option value="invitations">Invitations</option><option value="save_the_dates">Save the dates</option>
+      <option value="printed_day_of">Printed day-of</option><option value="seating">Seating</option>
+      <option value="drinkware_napkins">Drinkware + napkins</option><option value="keepsakes">Keepsakes</option>
+      <option value="custom_artwork">Custom artwork</option><option value="custom">Custom</option>
+    </select>
+    <select id="filter-urgent" onchange="renderAll()">
+      <option value="">All clients</option>
+      <option value="urgent">Due soon (60 days)</option>
+    </select>
+    <select id="filter-status" onchange="renderAll()">
+      <option value="">All statuses</option>
+      <option value="waiting_client">Waiting on client</option>
+      <option value="waiting_ashley">Waiting on Ashley</option>
+      <option value="in_production">In production</option>
+      <option value="needs_review">Needs review</option>
+      <option value="needs_follow_up">Needs follow-up</option>
+    </select>
+    <button class="btn btn-sm" onclick="clearFilters()">Clear</button>
+  </div>
+  <div style="display:flex;gap:6px">
+    <button class="btn btn-sm btn-active" id="btn-kanban" onclick="setView('kanban')">Kanban</button>
+    <button class="btn btn-sm" id="btn-table" onclick="setView('table')">Table</button>
+  </div>
+</div>
+
+<div id="view-kanban"></div>
+
+<div id="view-table" style="display:none">
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th><th>Workflow group</th><th>Order date</th><th>Wedding date</th>
+            <th>Phase</th><th>Phase timer</th><th>Proof status</th><th>Portal</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="client-tbody">
+          <tr><td colspan="9" style="text-align:center;color:#9a958f;padding:2.5rem;font-size:13px">Connecting...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div><!-- /main-content -->
+
+<!-- RIGHT SIDEBAR -->
+<div class="sidebar-wrap">
+  <div class="sidebar-card">
+    <div class="sidebar-title">
+      Next up for you
+      <span class="sidebar-count" id="sidebar-count" style="display:none"></span>
+    </div>
+    <div id="sidebar-items"></div>
+  </div>
+</div>
+</div><!-- /main-layout -->
+
+<div class="footer">Ashley Triggiano Fine Art + Stationery &mdash; Studio Command Center v11</div>
+<div class="toast" id="toast"></div>
+
+<!-- ADD MODAL -->
+<div id="modal-add" class="modal-overlay">
+  <div class="modal">
+    <div class="brand-bar"></div>
+    <div class="modal-header">
+      <p class="modal-title">Add project</p>
+      <button class="btn btn-sm" onclick="closeModal('modal-add')">Close</button>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Client name(s)</label><input id="f-name" placeholder="e.g. Sarah & James"/></div>
+      <div class="form-row"><label>Wedding date</label><input id="f-date" type="date"/></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Order date</label><input id="f-order-date" type="date"/></div>
+      <div class="form-row"><label>Service</label>
+        <select id="f-service">
+          <option value="">Select...</option>
+          <option>Semi-custom</option><option>Custom invitations</option>
+          <option>Day-of suite</option><option>Collection</option><option>STD only</option><option>Venue illustration</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Workflow group</label>
+        <select id="f-wg">
+          <option value="">Select...</option>
+          <option value="invitations">Invitations</option><option value="save_the_dates">Save the dates</option>
+          <option value="printed_day_of">Printed day-of</option><option value="seating">Seating</option>
+          <option value="drinkware_napkins">Drinkware + napkins</option><option value="keepsakes">Keepsakes</option>
+          <option value="custom_artwork">Custom artwork</option><option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Current phase</label>
+        <select id="f-phase">
+          <option>Onboarding</option><option>In design</option><option>In client's court</option>
+          <option>In production</option><option>Shipped</option><option>Completed</option>
+          <option>Dormant</option><option>On hold</option><option>Needs follow-up</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Planner / coordinator</label><input id="f-planner" placeholder="Name @ Studio"/></div>
+      <div class="form-row"><label>Client email</label><input id="f-email" type="email"/></div>
+    </div>
+    <div class="form-row"><label>Proof status</label>
+      <select id="f-proof">
+        <option>Not started</option><option>Draft in progress</option>
+        <option>Initial design sent</option><option>Revision requested</option>
+        <option>R1 sent</option><option>R1 revision requested</option>
+        <option>R2 sent</option><option>Minor changes requested</option>
+        <option>Additional revision requested</option><option>Approved</option>
+      </select>
+    </div>
+    <div class="form-row"><label>Internal notes</label><textarea id="f-notes" rows="3" placeholder="Anything to remember..."></textarea></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+      <button class="btn" onclick="closeModal('modal-add')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProject()">Add project</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="modal-edit" class="modal-overlay">
+  <div class="modal">
+    <div class="brand-bar"></div>
+    <div class="modal-header">
+      <p class="modal-title" id="edit-modal-title">Edit project</p>
+      <button class="btn btn-sm" onclick="closeModal('modal-edit')">Close</button>
+    </div>
+    <div class="modal-tabs" id="edit-tabs">
+      <button class="modal-tab active" data-tab="details" onclick="switchEditTab('details')">Details</button>
+      <button class="modal-tab" data-tab="proofs" onclick="switchEditTab('proofs')">Proofs</button>
+      <button class="modal-tab" data-tab="portal" onclick="switchEditTab('portal')">Portal</button>
+    </div>
+    <div id="edit-panel-details" class="edit-panel active">
+    <div id="items-block" style="display:none;background:#f8f6f3;border-radius:var(--radius);padding:12px;margin-bottom:14px">
+      <p class="section-label">Order items</p>
+      <div id="items-list"></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Client name(s)</label><input id="e-name"/></div>
+      <div class="form-row"><label>Wedding date</label><input id="e-date" type="date"/></div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Order date</label><input id="e-order-date" type="date"/></div>
+      <div class="form-row"><label>Service</label>
+        <select id="e-service">
+          <option>Semi-custom</option><option>Custom invitations</option>
+          <option>Day-of suite</option><option>Collection</option><option>STD only</option><option>Venue illustration</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Workflow group</label>
+        <select id="e-wg">
+          <option value="">None</option>
+          <option value="invitations">Invitations</option><option value="save_the_dates">Save the dates</option>
+          <option value="printed_day_of">Printed day-of</option><option value="seating">Seating</option>
+          <option value="drinkware_napkins">Drinkware + napkins</option><option value="keepsakes">Keepsakes</option>
+          <option value="custom_artwork">Custom artwork</option><option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Current phase</label>
+        <select id="e-phase">
+          <option>Onboarding</option><option>In design</option><option>In client's court</option>
+          <option>In production</option><option>Shipped</option><option>Completed</option>
+          <option>Dormant</option><option>On hold</option><option>Needs follow-up</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-2col">
+      <div class="form-row"><label>Planner / coordinator</label><input id="e-planner"/></div>
+      <div class="form-row"><label>Client email</label><input id="e-email" type="email"/></div>
+    </div>
+    <div class="form-row"><label>Proof status</label>
+      <select id="e-proof">
+        <option>Not started</option><option>Draft in progress</option>
+        <option>Initial design sent</option><option>Revision requested</option>
+        <option>R1 sent</option><option>R1 revision requested</option>
+        <option>R2 sent</option><option>Minor changes requested</option>
+        <option>Additional revision requested</option><option>Approved</option>
+      </select>
+    </div>
+    <div class="form-row"><label>Internal notes</label><textarea id="e-notes" rows="3"></textarea></div>
+    <div style="margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="e-dormant" style="width:auto;padding:0">
+        Mark as dormant (waiting — not yet active)
+      </label>
+    </div>
+
+    </div><!-- /edit-panel-details -->
+    <div id="edit-panel-proofs" class="edit-panel">
+    <div style="padding-top:0;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <p class="section-label" style="margin:0">Send proof to client</p>
+        <span id="proof-round-badge" style="display:none;font-size:11px;font-weight:500;padding:2px 9px;border-radius:20px;background:#eef2f7;color:#4a6580"></span>
+      </div>
+
+      <!-- Round history (previous rounds, collapsed) -->
+      <div id="proof-history" style="display:none;margin-bottom:10px"></div>
+
+      <!-- Sent banner (current round already sent) -->
+      <div id="proof-sent-banner" style="display:none;background:#eaf3de;border:1px solid #b6dea0;border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;font-size:12px;color:#27500a">
+        <span style="font-weight:500">✓ <span id="proof-sent-round-label">Proof</span> sent</span> — <span id="proof-sent-date"></span>
+        <a id="proof-sent-link" href="#" target="_blank" style="color:#185fa5;margin-left:6px;text-decoration:underline">View proof ↗</a>
+        <button onclick="resetProofPanel()" style="background:none;border:none;color:#27500a;cursor:pointer;font-size:11px;margin-left:8px;text-decoration:underline;font-family:inherit">Send new proof</button>
+      </div>
+
+      <!-- Per-item target selector (shown when the order has workflow groups) -->
+      <div class="form-row" id="proof-group-row" style="display:none">
+        <label>Send proof for <span style="font-weight:400;color:var(--text-3)">(check every piece included in this proof — e.g. menus + programs + place cards in one round)</span></label>
+        <div id="proof-group-checks" style="display:flex;flex-direction:column;gap:2px;background:#f8f6f3;border:0.5px solid var(--border-soft);border-radius:var(--radius);padding:8px 10px"></div>
+        <p id="proof-group-status" style="font-size:11px;color:var(--text-3);margin-top:4px">Nothing checked = one proof for the whole order (classic mode).</p>
+      </div>
+
+      <!-- Input panel (multi-image) -->
+      <div id="proof-input-panel">
+        <div class="form-row">
+          <label>Proof images <span style="font-weight:400;color:var(--text-3)">(up to 5 — shown as gallery in portal)</span></label>
+          <div id="proof-image-list"></div>
+          <div id="proof-add-controls" style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:1px solid var(--brand);border-radius:var(--radius);font-size:12px;color:var(--brand);background:var(--surface);transition:all .15s" id="cld-upload-label" onmouseenter="this.style.background='#eef2f7'" onmouseleave="this.style.background='var(--surface)'">
+              <input type="file" accept="image/*,.pdf" style="display:none" onchange="uploadProofImage(this)">
+              ↑ Upload image
+            </label>
+            <span id="cld-upload-status" style="font-size:12px;color:var(--text-3)"></span>
+          </div>
+        </div>
+        <div class="form-row" id="proof-url-add-row">
+          <label>Or paste a URL <span style="font-weight:400;color:var(--text-3)">(Cloudinary, Drive, Adobe CC…)</span></label>
+          <div style="display:flex;gap:8px">
+            <input id="e-proof-url-input" placeholder="Paste URL and click Add" style="flex:1"/>
+            <button class="btn btn-sm" onclick="addProofUrl()">Add</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Item name <span style="font-weight:400;color:var(--text-3)">(shown in email subject)</span></label>
+          <input id="e-proof-item" placeholder="e.g. Invitation Suite, Save the Dates..." style="width:100%"/>
+        </div>
+        <div class="form-row">
+          <label>Note to client <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>
+          <textarea id="e-proof-note" rows="2" placeholder="e.g. Take a look at your first proof! Let me know if you'd like any changes." style="width:100%"></textarea>
+        </div>
+        <button class="btn btn-sm" style="border-color:var(--brand);color:var(--brand)" onclick="previewProof()" id="btn-preview-proof">Preview &amp; confirm →</button>
+      </div>
+
+      <!-- CONFIRM PANEL -->
+      <div id="proof-confirm-panel" style="display:none;margin-top:12px;background:#f8f6f3;border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+        <p style="font-size:12px;font-weight:500;margin-bottom:10px;color:var(--text-2);letter-spacing:.04em;text-transform:uppercase">Email preview</p>
+        <div style="background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius);padding:12px;font-size:12px;line-height:1.6;margin-bottom:12px">
+          <p style="margin-bottom:4px"><span style="color:var(--text-3)">To:</span> <span id="confirm-email" style="font-weight:500"></span></p>
+          <p style="margin-bottom:8px"><span style="color:var(--text-3)">Subject:</span> <span id="confirm-subject" style="font-weight:500"></span></p>
+          <hr style="border:none;border-top:1px solid var(--border-soft);margin:8px 0"/>
+          <p style="margin-bottom:6px">Hi there,</p>
+          <p style="margin-bottom:6px">Your proof for <strong id="confirm-item"></strong> is ready to review!</p>
+          <p id="confirm-note-row" style="margin-bottom:6px;display:none;color:var(--text-2);font-style:italic"></p>
+          <p style="margin-bottom:6px"><a style="color:#185fa5" id="confirm-link-preview">View your proof ↗</a></p>
+          <p style="color:var(--text-3);font-size:11px">Please log in to your client portal to approve or request changes.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="sendProof()" id="btn-send-proof">✉ Send email &amp; mark proof sent</button>
+          <button class="btn btn-sm" onclick="resetProofConfirm()">Edit</button>
+        </div>
+      </div>
+
+      <!-- CLIENT RESPONSE -->
+      <div id="proof-response-panel" style="display:none;margin-top:10px;background:#f8f6f3;border-radius:var(--radius);padding:10px 12px;font-size:12px">
+        <p style="font-weight:500;margin-bottom:4px;font-size:12px">Client response</p>
+        <p id="proof-response-status" style="margin-bottom:4px"></p>
+        <p id="proof-response-notes" style="color:var(--text-2);font-style:italic"></p>
+        <p id="proof-response-date" style="color:var(--text-3);margin-top:4px;font-size:11px"></p>
+      </div>
+    </div>
+
+    <!-- PORTAL LINK SECTION -->
+    </div><!-- /edit-panel-proofs -->
+    <div id="edit-panel-portal" class="edit-panel">
+    <div style="padding-top:0;margin-bottom:14px" id="edit-portal-section">
+      <p class="section-label" style="margin-bottom:8px">Client portal</p>
+      <div id="edit-portal-status"></div>
+    </div>
+
+    </div><!-- /edit-panel-portal -->
+    <div id="delete-confirm-box" class="delete-confirm-box">
+      <p style="font-weight:500;color:#a32d2d;font-size:13px;margin-bottom:4px">Delete this project?</p>
+      <p style="font-size:12px;color:#5a2a2a;line-height:1.5;margin-bottom:10px">This will permanently remove <strong id="delete-confirm-name"></strong> and all associated data. This cannot be undone.</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-danger" onclick="confirmDeleteProject()">Yes, delete permanently</button>
+        <button class="btn btn-sm" onclick="hideDeleteConfirm()">Cancel</button>
+      </div>
+    </div>
+    <div id="edit-footer-details" style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <button class="btn btn-danger btn-sm" onclick="deleteProject()">Delete</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeModal('modal-edit')">Cancel</button>
+        <button class="btn btn-primary" onclick="updateProject()">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PORTAL LINK MODAL -->
+<div id="modal-portal" class="modal-overlay">
+  <div class="modal">
+    <div class="brand-bar"></div>
+    <div class="modal-header">
+      <p class="modal-title">Send portal link</p>
+      <button class="btn btn-sm" onclick="closeModal('modal-portal')">Close</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-2);margin-bottom:16px;line-height:1.6">
+      Pick a project to generate a secure portal link and send the client a welcome email.
+      Links are valid for 90 days. Generating a new link replaces the old one.
+    </p>
+    <div class="form-row">
+      <label>Select project</label>
+      <select id="pl-project" onchange="onPortalProjectChange()" style="width:100%">
+        <option value="">Choose a project...</option>
+      </select>
+    </div>
+    <div id="pl-details" style="display:none">
+      <div style="background:#f8f6f3;border:1px solid var(--border-soft);border-radius:var(--radius);padding:12px;margin-bottom:14px;font-size:12px;line-height:1.7">
+        <p><span style="color:var(--text-3)">Client email:</span> <strong id="pl-email-display"></strong></p>
+        <p><span style="color:var(--text-3)">Current portal status:</span> <span id="pl-status-display"></span></p>
+        <p id="pl-existing-link-row" style="display:none"><span style="color:var(--text-3)">Current link:</span> <a id="pl-existing-link" href="#" target="_blank" style="color:var(--brand);word-break:break-all"></a></p>
+      </div>
+      <div class="form-row">
+        <label>Client email <span style="font-weight:400;color:var(--text-3)">(edit if needed)</span></label>
+        <input id="pl-email-input" type="email" style="width:100%"/>
+      </div>
+      <div id="pl-no-email-warn" style="display:none;background:#fbeaf0;border:0.5px solid #f4c0d1;border-radius:var(--radius);padding:8px 12px;font-size:12px;color:#993556;margin-bottom:10px">
+        No email on file — enter one above before sending.
+      </div>
+      <div id="pl-confirm-panel" style="display:none;background:#eaf3de;border:1px solid #b6dea0;border-radius:var(--radius);padding:12px;margin-bottom:12px;font-size:12px;line-height:1.6">
+        <p style="font-weight:500;margin-bottom:4px">✓ Ready to send</p>
+        <p style="color:#27500a">A welcome email will go to <strong id="pl-confirm-email"></strong> with a link to their portal. The link expires in 90 days.</p>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+      <button class="btn" onclick="closeModal('modal-portal')">Cancel</button>
+      <button class="btn btn-primary" id="pl-send-btn" onclick="sendPortalLink()" disabled>Generate &amp; send link</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://kfpicwptqhufsjdoidvp.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmcGljd3B0cWh1ZnNqZG9pZHZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MTg5OTEsImV4cCI6MjA5MDQ5NDk5MX0.WAl8UkIHyQYJMS-JmDndvqph9gtfsIQr0AYkVlw2vKw';
+const EDGE='https://kfpicwptqhufsjdoidvp.supabase.co/functions/v1/client-portal';
+const{createClient}=supabase;
+// Studio passphrase: entered once per browser session, kept only in sessionStorage.
+// It is NEVER hard-coded in this file — that is the whole point of the change.
+const STUDIO_KEY=sessionStorage.getItem('at_studio_key')||'';
+const db=createClient(SUPABASE_URL,SUPABASE_ANON,{global:{headers:{'x-dashboard-key':STUDIO_KEY}}});
+
+// Follow-ups are data-driven: set a project's phase to 'Needs follow-up' to flag it.
+const PHASES=['Onboarding','In design',"In client's court",'In production','Shipped','Completed','Dormant','On hold','Needs follow-up'];
+const PHASE_CLASS={
+  'Onboarding':'s-booked','In design':'s-design',"In client's court":'s-awaiting-approval',
+  'In production':'s-production','Shipped':'s-shipped','Completed':'s-complete',
+  'Dormant':'s-dormant','On hold':'s-dormant','Needs follow-up':'s-awaiting-approval',
+};
+const WG_LABELS={invitations:'Invitations',save_the_dates:'Save the dates',printed_day_of:'Printed day-of',seating:'Seating',drinkware_napkins:'Drinkware + napkins',keepsakes:'Keepsakes',custom_artwork:'Custom artwork',custom:'Custom'};
+const WARN_PHASES=['In design',"In client's court"];
+// Statuses that mean Ashley needs to act (upload a new/revised proof or follow up)
+const AWAITING_ASHLEY=['Revision requested','R1 revision requested','Additional revision requested'];
+// "Done" phases — finished work, excluded from active counts/brief
+const DONE_PHASES=['Shipped','Completed'];
+function isDone(p){return DONE_PHASES.includes(p.phase);}
+// Normalize any legacy / edge-function-written phase into the current 6-phase model,
+// so old data and new Shopify orders / portal submissions all land in the right column.
+const PHASE_ALIAS={
+  'Booked':'Onboarding','Questionnaire sent':'Onboarding','Awaiting wording':'Onboarding','Wording':'Onboarding','Awaiting customization':'Onboarding',
+  'Wording received':'In design','Design':'In design','Design in progress':'In design',
+  'Proofs sent':"In client's court",'Awaiting approval':"In client's court",'Proofing':"In client's court",
+  'Ready for print':'In production',
+  'Complete':'Completed',
+};
+function canonPhase(ph){return PHASE_ALIAS[ph]||ph||'Onboarding';}
+
+let projects=[],projectItems={},projectGroups={},editId=null,currentView='kanban',briefOpen=false;
+let proofImageList=[];
+
+function getStaleWarning(p) {
+  const now = new Date();
+  function dSince(dateValue) {
+    if (!dateValue) return null;
+    return Math.floor((now - new Date(dateValue)) / (1000*60*60*24));
+  }
+  // Proof sent, no client response in 7+ days
+  if (['Initial design sent','R1 sent','R2 sent'].includes(p.proof_status) && !p.proof_responded_at) {
+    const days = dSince(p.proof_uploaded_at ? p.proof_uploaded_at.split('T')[0] : p.phase_since);
+    if (days !== null && days >= 7) return `Client input pending — ${days}d`;
+  }
+  // In client's court for 7+ days
+  if (p.phase === "In client's court") {
+    const days = dSince(p.proof_uploaded_at ? p.proof_uploaded_at.split('T')[0] : p.phase_since);
+    if (days !== null && days >= 7) return `In client's court — ${days}d`;
+  }
+  // Needs follow-up
+  if (p.phase === 'Needs follow-up') return 'Needs follow-up';
+  return '';
+}
+
+function setSyncStatus(s){
+  const dot=document.getElementById('sync-dot'),txt=document.getElementById('sync-status');
+  dot.className='sync-dot'+(s==='syncing'?' syncing':s==='error'?' error':'');
+  txt.textContent=s==='ok'?'Cloud sync active':s==='syncing'?'Saving...':'Connection error';
+}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function daysSince(d){if(!d)return null;const t=new Date(d+'T12:00:00'),n=new Date();n.setHours(0,0,0,0);t.setHours(0,0,0,0);return Math.round((n-t)/86400000);}
+function daysTo(d){if(!d)return null;const t=new Date(d+'T12:00:00'),n=new Date();n.setHours(0,0,0,0);t.setHours(0,0,0,0);return Math.round((t-n)/86400000);}
+function phaseTimerHtml(p){const days=daysSince(p.phase_since);if(days===null||p.dormant)return '<span style="font-size:12px;color:#9a958f">—</span>';const warn=days>=3&&WARN_PHASES.includes(p.phase);return '<span class="phase-timer'+(warn?' phase-timer-warn':'')+'">'+(days)+'d</span>';}
+function wgBadge(wg,small){if(!wg)return '';const label=WG_LABELS[wg]||wg;const sz=small?'font-size:10px;padding:1px 7px':'';return '<span class="pill wg-'+wg+'" style="'+sz+'">'+label+'</span>';}
+
+function switchEditTab(name){
+  document.querySelectorAll('#edit-tabs .modal-tab').forEach(t=>{
+    t.classList.toggle('active',t.dataset.tab===name);
+  });
+  document.querySelectorAll('.edit-panel').forEach(p=>{
+    p.classList.toggle('active',p.id==='edit-panel-'+name);
+  });
+  const footer=document.getElementById('edit-footer-details');
+  if(footer) footer.style.display=name==='details'?'flex':'none';
+}
+function setView(v){currentView=v;document.getElementById('view-kanban').style.display=v==='kanban'?'block':'none';document.getElementById('view-table').style.display=v==='table'?'block':'none';document.getElementById('btn-kanban').className='btn btn-sm'+(v==='kanban'?' btn-active':'');document.getElementById('btn-table').className='btn btn-sm'+(v==='table'?' btn-active':'');renderCurrent();}
+
+async function load(){
+  setSyncStatus('syncing');
+  const{data,error}=await db.from('projects').select('*').order('date',{ascending:true,nullsFirst:false});
+  if(error){setSyncStatus('error');console.error(error);return false;}
+  projects=(data||[]).map(p=>({...p,phase:canonPhase(p.phase)}));
+  projectItems={};
+  const ids=projects.map(p=>p.id);
+  if(ids.length){
+    const{data:items,error:ie}=await db.from('project_items').select('project_id,product_title,collection_name,item_type,quantity,vendor,proof_status,form_submitted').in('project_id',ids);
+    if(ie)console.error(ie);
+    (items||[]).forEach(i=>{if(!projectItems[i.project_id])projectItems[i.project_id]=[];projectItems[i.project_id].push(i);});
+    // Per-item proofing: load each project's workflow groups for the proof target selector
+    projectGroups={};
+    const{data:wgs,error:we}=await db.from('workflow_groups').select('id,project_id,label,portal_label,proof_status,proof_link,proof_sent_at,phase,dormant,notes').in('project_id',ids);
+    if(we)console.error(we);
+    (wgs||[]).forEach(g=>{if(!projectGroups[g.project_id])projectGroups[g.project_id]=[];projectGroups[g.project_id].push(g);});
+  }
+  setSyncStatus('ok');renderAll();
+  return true;
+}
+
+function getFiltered(){
+  const fc=document.getElementById('filter-client').value.toLowerCase();
+  const fp=document.getElementById('filter-phase').value;
+  const fwg=document.getElementById('filter-wg').value;
+  const fu=document.getElementById('filter-urgent').value;
+  const fs=document.getElementById('filter-status')?.value||'';
+  return projects.filter(p=>{
+    if(fc&&!p.name.toLowerCase().includes(fc))return false;
+    if(fp&&p.phase!==fp)return false;
+    if(fwg&&p.workflow_group!==fwg)return false;
+    if(fu==='urgent'){const d=daysTo(p.date);if(d===null||d>60)return false;}
+    if(fs==='waiting_client'&&!(['Initial design sent','R1 sent','R2 sent'].includes(p.proof_status)&&!p.proof_responded_at))return false;
+    if(fs==='waiting_ashley'&&!AWAITING_ASHLEY.includes(p.proof_status))return false;
+    if(fs==='in_production'&&p.phase!=='In production')return false;
+    if(fs==='needs_review'&&p.phase!=="In client's court")return false;
+    if(fs==='needs_follow_up'&&p.phase!=='Needs follow-up')return false;
+    return true;
+  });
+}
+
+function renderMetrics(){
+  const active=projects.filter(p=>!isDone(p)&&!p.dormant);
+  const dormant=projects.filter(p=>p.dormant);
+  const urgent=projects.filter(p=>{const d=daysTo(p.date);return d!==null&&d<=60&&!isDone(p);});
+  const proofs=projects.filter(p=>p.phase==="In client's court");
+  document.getElementById('metrics-row').innerHTML=[['Active projects',active.length],['Dormant',dormant.length],['Due in 60 days',urgent.length],['Proofs out',proofs.length]].map(([l,v])=>'<div class="metric"><p class="metric-label">'+l+'</p><p class="metric-val">'+v+'</p></div>').join('');
+}
+
+// ── DAILY BRIEF ──────────────────────────────────────────────────
+function renderBrief(){
+  const active=projects.filter(p=>!isDone(p)&&!p.dormant);
+  const recentChanges=active.filter(p=>{const d=daysSince(p.phase_since);return d!==null&&d<=1;});
+  const stale=active.filter(p=>{const d=daysSince(p.phase_since);return d!==null&&d>=3&&WARN_PHASES.includes(p.phase);});
+  const awaitingAshley=active.filter(p=>AWAITING_ASHLEY.includes(p.proof_status));
+  const awaitingClient=active.filter(p=>(['Initial design sent','R1 sent','R2 sent'].includes(p.proof_status)||p.phase==="In client's court")&&!p.proof_responded_at);
+  const flagged=projects.filter(p=>p.phase==='Needs follow-up'&&!p.dormant);
+  const totalActions=awaitingAshley.length+stale.length+flagged.length;
+  document.getElementById('brief-dot').className='brief-dot'+(totalActions===0?' quiet':'');
+  document.getElementById('brief-subtitle').textContent=totalActions===0?'All clear — nothing urgent today':`${totalActions} item${totalActions!==1?'s':''} need your attention`;
+
+  function row(p,cls,meta){return `<div class="brief-row ${cls}" onclick="openEdit(${p.id})" style="cursor:pointer"><span class="brief-name">${p.name}</span><span class="brief-meta">${meta}</span></div>`;}
+  const actionLabels={'Revision requested':'Upload revised proof','R1 revision requested':'Upload R1 revision','Additional revision requested':'Billable revision — follow up'};
+  let html='';
+  if(awaitingAshley.length) html+=`<div class="brief-section"><div class="brief-section-title">Needs your action</div>${awaitingAshley.map(p=>row(p,'action',actionLabels[p.proof_status]||'Upload new proof')).join('')}</div>`;
+  if(stale.length) html+=`<div class="brief-section"><div class="brief-section-title">Stale in current phase (3+ days)</div>${stale.map(p=>row(p,'warn',p.phase+' · '+daysSince(p.phase_since)+'d')).join('')}</div>`;
+  if(awaitingClient.length) html+=`<div class="brief-section"><div class="brief-section-title">Waiting on client</div>${awaitingClient.map(p=>{const d=daysSince(p.proof_uploaded_at?p.proof_uploaded_at.split('T')[0]:p.phase_since);return row(p,'neutral','Proof sent '+(d!==null?d+'d ago':''));}).join('')}</div>`;
+  if(recentChanges.length) html+=`<div class="brief-section"><div class="brief-section-title">Phase changes in last 24h</div>${recentChanges.map(p=>row(p,'neutral','→ '+p.phase)).join('')}</div>`;
+  if(flagged.length) html+=`<div class="brief-section"><div class="brief-section-title">Flagged follow-ups</div>${flagged.map(p=>row(p,'flag',p.phase||'No phase set')).join('')}</div>`;
+  if(!html) html='<p class="brief-empty">Nothing needs your attention right now. Nice work!</p>';
+  document.getElementById('brief-body').innerHTML=html;
+}
+
+function toggleBrief(){
+  briefOpen=!briefOpen;
+  document.getElementById('brief-body').className='brief-body'+(briefOpen?' open':'');
+  document.getElementById('brief-chevron').className='brief-chevron'+(briefOpen?' open':'');
+  document.getElementById('brief-wrap').querySelector('.brief-header').style.borderRadius=briefOpen?'var(--radius-lg) var(--radius-lg) 0 0':'var(--radius-lg)';
+}
+
+function renderKanban(){
+  const list=getFiltered().filter(p=>!p.dormant);
+  const dormantList=getFiltered().filter(p=>p.dormant);
+  const wrap=document.getElementById('view-kanban');
+  // Show columns in PHASES order; any project with an unexpected phase still gets its own column (never hidden).
+  const present=[...new Set(list.map(p=>p.phase||'No phase set'))];
+  const usedPhases=[...PHASES.filter(ph=>present.includes(ph)),...present.filter(ph=>!PHASES.includes(ph))];
+  if(!usedPhases.length&&!dormantList.length){wrap.innerHTML='<p style="color:#9a958f;font-size:13px;padding:1rem">No projects match</p>';return;}
+  wrap.innerHTML='<div class="kanban-wrap">'+usedPhases.map(phase=>{
+    const cards=list.filter(p=>(p.phase||'No phase set')===phase);
+    return '<div class="kanban-col" data-phase="'+phase+'" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event,this)">'+
+      '<div class="kanban-col-title"><span>'+phase+'</span><span style="font-weight:400;opacity:.55">'+cards.length+'</span></div>'+
+      cards.map(p=>{
+        const wDays=daysTo(p.date);
+        const wFlag=wDays!==null&&wDays<=60&&!DONE_PHASES.includes(phase)?'<span class="pill flag-hot" style="font-size:10px;padding:1px 7px;margin-left:3px">'+wDays+'d</span>':'';
+        const noPortal=!p.magic_token?'<span style="font-size:10px;color:#9a958f;background:#f0ede7;padding:1px 6px;border-radius:4px;margin-left:3px">no portal</span>':'';
+        const items=projectItems[p.id]||[];
+        const itemsHtml=items.length?'<div style="margin-top:7px;border-top:0.5px solid var(--border-soft);padding-top:6px">'+items.map(i=>'<div class="item-line"><span>'+(i.item_type?i.item_type.replace(/_/g,' '):(i.product_title||'—'))+'</span><span style="color:var(--text-3)">'+i.quantity+'</span></div>').join('')+'</div>':'';
+        const staleWarn=getStaleWarning(p);
+        const staleHtml=staleWarn?`<div><span class="stale-warn">${staleWarn}</span></div>`:'';
+        return '<div class="kanban-card" draggable="true" ondragstart="dragStart(event,'+p.id+')" ondragend="dragEnd(event)" onclick="openEdit('+p.id+')">'+
+          '<p style="font-weight:500;font-size:13px;margin-bottom:3px">'+p.name+'</p>'+
+          '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;flex-wrap:wrap">'+wgBadge(p.workflow_group,true)+wFlag+noPortal+'</div>'+
+          '<p style="font-size:11px;color:#9a958f;margin-bottom:4px">'+(p.date?new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'No date')+'</p>'+
+          phaseTimerHtml(p)+staleHtml+itemsHtml+'</div>';
+      }).join('')+'</div>';
+  }).join('')+'</div>'+
+  (dormantList.length?'<div class="dormant-section"><p class="dormant-section-title">Dormant — waiting to activate ('+dormantList.length+')</p><div class="dormant-grid">'+dormantList.map(p=>'<div class="kanban-card dormant-card" onclick="openEdit('+p.id+')"><p style="font-weight:500;font-size:13px;margin-bottom:3px">'+p.name+'</p><div style="margin-bottom:4px">'+wgBadge(p.workflow_group,true)+'</div><p style="font-size:11px;color:#9a958f">'+(p.dormant_reason||'Dormant')+'</p></div>').join('')+'</div></div>':'');
+}
+
+function renderTable(){
+  const list=getFiltered();
+  const tbody=document.getElementById('client-tbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9a958f;padding:2.5rem;font-size:13px">No projects match</td></tr>';return;}
+  tbody.innerHTML=list.map(p=>{
+    const wDays=daysTo(p.date),oDays=daysSince(p.order_date);
+    const dateLabel=p.date?new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+    const oLabel=p.order_date?new Date(p.order_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+    const wFlag=wDays!==null&&wDays<=60&&!isDone(p)?' <span class="pill flag-hot">'+wDays+'d</span>':wDays!==null&&wDays<=90?' <span class="pill flag-ok">'+wDays+'d</span>':'';
+    const oFlag=oDays!==null?' <span class="pill flag-info">'+oDays+'d ago</span>':'';
+    return '<tr><td><p style="font-weight:500;font-size:13px">'+p.name+'</p>'+(p.planner?'<p style="font-size:11px;color:#9a958f">'+p.planner+'</p>':'')+'</td><td>'+wgBadge(p.workflow_group,false)+'</td><td style="white-space:nowrap"><span style="font-size:12px">'+oLabel+'</span>'+oFlag+'</td><td style="white-space:nowrap"><span style="font-size:12px">'+dateLabel+'</span>'+wFlag+'</td><td><span class="pill '+(PHASE_CLASS[p.phase]||'s-booked')+'">'+p.phase+'</span>'+(p.dormant?'<span class="pill s-dormant" style="margin-left:4px">Dormant</span>':'')+'</td><td>'+phaseTimerHtml(p)+'</td><td><span style="font-size:12px;color:#5a5751">'+(p.proof_status||'—')+'</span></td><td><label class="toggle"><input type="checkbox" '+(p.portal_active?'checked':'')+' onchange="togglePortal('+p.id+',this.checked)"><span class="t-slider"></span></label></td><td><button class="btn btn-sm" onclick="openEdit('+p.id+')">Edit</button></td></tr>';
+  }).join('');
+}
+
+function renderCurrent(){if(currentView==='kanban')renderKanban();else renderTable();}
+
+// ── SIDEBAR ──────────────────────────────────────────────────────
+function renderSidebar(){
+  const active=projects.filter(p=>!isDone(p)&&!p.dormant);
+  const items=[];
+  const actionLabels={'Revision requested':'Upload revised proof','R1 revision requested':'Upload R1 revision','Additional revision requested':'Billable revision — follow up'};
+  active.filter(p=>AWAITING_ASHLEY.includes(p.proof_status)).forEach(p=>{
+    const d=daysSince(p.proof_responded_at?p.proof_responded_at.split('T')[0]:p.phase_since);
+    items.push({p,priority:'high',action:actionLabels[p.proof_status]||'Upload new proof',meta:d!==null?d+'d waiting':'',note:p.proof_notes});
+  });
+  active.filter(p=>p.phase==='Wording received').forEach(p=>{const d=daysSince(p.phase_since);items.push({p,priority:'medium',action:'Start design',meta:d!==null?d+'d since received':''});});
+  active.filter(p=>(['Initial design sent','R1 sent','R2 sent'].includes(p.proof_status)||p.phase==="In client's court")&&!p.proof_responded_at).forEach(p=>{const d=daysSince(p.proof_uploaded_at?p.proof_uploaded_at.split('T')[0]:p.phase_since);if(d!==null&&d>=5)items.push({p,priority:'low',action:'Follow up — no reply yet',meta:d+'d since proof sent'});});
+  projects.filter(p=>p.phase==='Needs follow-up'&&!p.dormant).forEach(p=>items.push({p,priority:'flag',action:'Pending follow-up',meta:'Flagged'}));
+  const countEl=document.getElementById('sidebar-count'),listEl=document.getElementById('sidebar-items');
+  if(!items.length){countEl.style.display='none';listEl.innerHTML='<div class="sidebar-empty"><div style="font-size:20px;margin-bottom:6px;opacity:.4">✓</div><p style="font-size:12px;color:var(--text-3);line-height:1.5">Nothing waiting on you right now.</p></div>';return;}
+  countEl.style.display='inline-block';countEl.textContent=items.length;
+  listEl.innerHTML=items.map(({p,priority,action,meta,note})=>`<div class="sidebar-item si-${priority}" onclick="openEdit(${p.id})"><p class="si-name">${p.name}</p><p class="si-action si-action-${priority}">${action}</p>${meta?`<p class="si-meta">${meta}</p>`:''}${note?`<p class="si-note">"${note.length>55?note.substring(0,55)+'…':note}"</p>`:''}</div>`).join('');
+}
+
+function renderAll(){renderMetrics();renderBrief();renderSidebar();renderCurrent();}
+function clearFilters(){document.getElementById('filter-client').value='';['filter-phase','filter-wg','filter-urgent','filter-status'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderAll();}
+function openAddModal(){document.getElementById('modal-add').classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+async function saveProject(){
+  const name=document.getElementById('f-name').value.trim();if(!name){const el=document.getElementById('f-name');el.focus();el.style.borderColor='#a32d2d';setTimeout(()=>{el.style.borderColor='';},2000);showToast('Please enter a client name.');return;}
+  const today=new Date().toISOString().split('T')[0];
+  const rec={name,date:document.getElementById('f-date').value||null,order_date:document.getElementById('f-order-date').value||null,service:document.getElementById('f-service').value,workflow_group:document.getElementById('f-wg').value||null,phase:document.getElementById('f-phase').value,phase_since:today,planner:document.getElementById('f-planner').value,client_email:document.getElementById('f-email').value,proof_status:document.getElementById('f-proof').value,notes:document.getElementById('f-notes').value,portal_active:false,dormant:false};
+  setSyncStatus('syncing');
+  const{data,error}=await db.from('projects').insert(rec).select().single();
+  if(!error&&data){projects.push(data);projectItems[data.id]=[];showToast('Project added');}else showToast('Error saving');
+  setSyncStatus(error?'error':'ok');closeModal('modal-add');
+  ['f-name','f-date','f-order-date','f-planner','f-email','f-notes'].forEach(id=>{document.getElementById(id).value='';});renderAll();
+}
+
+function openEdit(id){
+  const p=projects.find(x=>x.id===id);if(!p)return;
+  editId=id;
+  document.getElementById('edit-modal-title').textContent='Edit — '+p.name;
+  document.getElementById('e-name').value=p.name||'';
+  document.getElementById('e-date').value=p.date||'';
+  document.getElementById('e-order-date').value=p.order_date||'';
+  document.getElementById('e-service').value=p.service||'Semi-custom';
+  document.getElementById('e-wg').value=p.workflow_group||'';
+  document.getElementById('e-phase').value=p.phase||'Onboarding';
+  document.getElementById('e-planner').value=p.planner||'';
+  document.getElementById('e-email').value=p.client_email||'';
+  document.getElementById('e-proof').value=p.proof_status||'Not started';
+  document.getElementById('e-notes').value=p.notes||'';
+  document.getElementById('e-dormant').checked=p.dormant||false;
+
+  initProofSection();
+
+  // Per-item proof targets (checkboxes — one proof round can cover several pieces)
+  const pGroups=projectGroups[id]||[];
+  const gRow=document.getElementById('proof-group-row');
+  const gChecks=document.getElementById('proof-group-checks');
+  if(pGroups.length){
+    gRow.style.display='block';
+    gChecks.innerHTML=pGroups.map(g=>{
+      const meta=(g.dormant?' · dormant':'')+(g.proof_status&&g.proof_status!=='Not started'?' — '+g.proof_status:'');
+      return '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;padding:2px 0"><input type="checkbox" class="proof-group-check" value="'+g.id+'" onchange="onProofGroupChange()" style="width:auto;margin:0">'+(g.portal_label||g.label)+'<span style="color:var(--text-3);font-size:11px">'+meta+'</span></label>';
+    }).join('');
+    document.getElementById('proof-group-status').textContent='Nothing checked = one proof for the whole order (classic mode).';
+  }else{gRow.style.display='none';gChecks.innerHTML='';}
+
+  // Round badge
+  const round=p.proof_round||0;
+  const badge=document.getElementById('proof-round-badge');
+  const roundLabels=['Initial design','Revision 1','Revision 2'];
+  if(p.proof_url||round>0){badge.style.display='inline-block';badge.textContent=roundLabels[Math.min(round,2)];badge.style.background=round>=2?'#faeeda':'#eef2f7';badge.style.color=round>=2?'#633806':'#4a6580';}
+  else{badge.style.display='none';}
+
+  // Round history — completed rounds before the current active round
+  const historyEl=document.getElementById('proof-history');
+  const hRows=[];
+  if(round>=1&&p.proof_url) hRows.push({label:'Initial design',url:p.proof_url});
+  if(round>=2&&p.proof_url_r1) hRows.push({label:'Revision 1',url:p.proof_url_r1});
+  if(hRows.length){
+    historyEl.style.display='block';
+    historyEl.innerHTML='<p style="font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);margin-bottom:5px">Previous rounds</p>'+
+      hRows.map(h=>{const urls=h.url.split(',').map(u=>u.trim()).filter(Boolean);const count=urls.length;const primary=urls[0]||'';return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#f8f6f3;border:0.5px solid var(--border-soft);border-radius:var(--radius);margin-bottom:4px;font-size:12px"><span style="color:var(--text-2)">${h.label} &mdash; ${count} image${count!==1?'s':''}</span><a href="${primary}" target="_blank" style="color:var(--brand);font-size:11px;text-decoration:none">View ↗</a></div>`;}).join('');
+  } else {historyEl.style.display='none';historyEl.innerHTML='';}
+
+  // Sent banner vs input panel
+  const sentStatuses=['Initial design sent','R1 sent','R2 sent','Approved','Minor changes requested','Additional revision requested'];
+  const roundUrlKeys=['proof_url','proof_url_r1','proof_url_r2'];
+  const currentRoundUrl=p[roundUrlKeys[Math.min(round,2)]];
+  const hasSentProof=sentStatuses.includes(p.proof_status)&&!!currentRoundUrl;
+  document.getElementById('proof-sent-banner').style.display=hasSentProof?'block':'none';
+  document.getElementById('proof-input-panel').style.display=hasSentProof?'none':'block';
+  if(hasSentProof){
+    const urls=currentRoundUrl.split(',').map(u=>u.trim()).filter(Boolean);
+    const sentDate=p.proof_uploaded_at?new Date(p.proof_uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    const roundSentLabels=['Initial design','Revision 1','Revision 2'];
+    document.getElementById('proof-sent-round-label').textContent=roundSentLabels[Math.min(round,2)];
+    document.getElementById('proof-sent-date').textContent='Sent '+sentDate;
+    const lnk=document.getElementById('proof-sent-link');
+    lnk.href=urls[0]||'#';lnk.textContent=urls.length>1?`View proof (${urls.length} images) ↗`:'View proof ↗';
+  }
+
+  // Client response panel
+  const respStatuses=['Approved','Revision requested','R1 revision requested','Minor changes requested','Additional revision requested'];
+  const hasResponse=respStatuses.includes(p.proof_status);
+  document.getElementById('proof-response-panel').style.display=hasResponse?'block':'none';
+  if(hasResponse){
+    const labels={'Approved':'<span style="color:#27500a;font-weight:500">✓ Approved</span>','Revision requested':'<span style="color:#993556;font-weight:500">✏ Changes requested</span>','R1 revision requested':'<span style="color:#993556;font-weight:500">✏ Changes requested (R1)</span>','Minor changes requested':'<span style="color:#854f0b;font-weight:500">📝 Minor adjustment requested</span>','Additional revision requested':'<span style="color:#a32d2d;font-weight:500">⏱ Additional revision requested</span>'};
+    document.getElementById('proof-response-status').innerHTML=labels[p.proof_status]||p.proof_status;
+    document.getElementById('proof-response-notes').textContent=p.proof_notes||'';
+    document.getElementById('proof-response-date').textContent=p.proof_responded_at?'Responded '+new Date(p.proof_responded_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  }
+
+  // Portal link
+  const portalEl=document.getElementById('edit-portal-status');
+  if(p.magic_token){const url='https://ashleytriggiano.com/client-portal?token='+p.magic_token;const exp=p.token_expires?new Date(p.token_expires).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'no expiry set';portalEl.innerHTML=`<p style="font-size:12px;margin-bottom:6px"><a href="${url}" target="_blank" style="color:var(--brand);word-break:break-all">${url}</a></p><p style="font-size:11px;color:var(--text-3);margin-bottom:8px">Expires ${exp} · ${p.portal_active?'Active':'Inactive'}</p><button class="btn btn-sm" onclick="openPortalLinkModalForProject(${p.id})">Regenerate &amp; resend link</button>`;}
+  else{portalEl.innerHTML=`<p style="font-size:12px;color:var(--text-3);margin-bottom:8px">No portal link yet.</p><button class="btn btn-sm btn-primary" onclick="openPortalLinkModalForProject(${p.id})">Generate &amp; send portal link</button>`;}
+
+  // Order items
+  const its=projectItems[id]||[];const block=document.getElementById('items-block');const list=document.getElementById('items-list');
+  if(its.length){list.innerHTML=its.map(i=>{const label=i.item_type?i.item_type.replace(/_/g,' '):i.product_title||'—';const col=i.collection_name||'';return '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:0.5px solid var(--border-soft)"><div><p style="font-size:13px;font-weight:500;text-transform:capitalize">'+label+'</p>'+(col?'<p style="font-size:11px;color:var(--text-3)">'+col+'</p>':'')+'</div><div style="text-align:right;flex-shrink:0;margin-left:12px"><p style="font-size:12px;color:var(--text-2)">Qty '+(i.quantity||1)+'</p><p style="font-size:11px;color:var(--text-3)">'+(i.vendor||'')+'</p></div></div>';}).join('');block.style.display='block';}else{block.style.display='none';}
+
+  document.getElementById('modal-edit').classList.add('open');
+  // Auto-tab: proof action needed → Proofs; no portal → Portal; else Details
+  if(AWAITING_ASHLEY.includes(p.proof_status)) switchEditTab('proofs');
+  else if(!p.magic_token&&!p.dormant) switchEditTab('portal');
+  else switchEditTab('details');
+}
+
+async function updateProject(){
+  const p=projects.find(x=>x.id===editId);if(!p)return;
+  const today=new Date().toISOString().split('T')[0];
+  const newPhase=document.getElementById('e-phase').value;
+  const phaseChanged=newPhase!==p.phase;
+  const newDormant=document.getElementById('e-dormant').checked;
+  const updates={name:document.getElementById('e-name').value,date:document.getElementById('e-date').value||null,order_date:document.getElementById('e-order-date').value||null,service:document.getElementById('e-service').value,workflow_group:document.getElementById('e-wg').value||null,phase:newDormant?'Dormant':newPhase,phase_since:phaseChanged?today:p.phase_since,planner:document.getElementById('e-planner').value,client_email:document.getElementById('e-email').value,proof_status:document.getElementById('e-proof').value,notes:document.getElementById('e-notes').value,dormant:newDormant};
+  setSyncStatus('syncing');const{error}=await db.from('projects').update(updates).eq('id',editId);Object.assign(p,updates);setSyncStatus(error?'error':'ok');
+  if(!error)showToast(phaseChanged?'Phase updated — timer reset':'Changes saved');closeModal('modal-edit');renderAll();
+}
+
+function deleteProject(){
+  const p=projects.find(x=>x.id===editId);if(!p)return;
+  document.getElementById('delete-confirm-name').textContent=p.name;
+  document.getElementById('delete-confirm-box').classList.add('open');
+  document.getElementById('delete-confirm-box').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function hideDeleteConfirm(){
+  document.getElementById('delete-confirm-box').classList.remove('open');
+}
+async function confirmDeleteProject(){
+  setSyncStatus('syncing');
+  await db.from('projects').delete().eq('id',editId);
+  projects=projects.filter(x=>x.id!==editId);
+  delete projectItems[editId];
+  setSyncStatus('ok');
+  showToast('Project deleted');
+  closeModal('modal-edit');
+  renderAll();
+}
+
+async function togglePortal(id,val){const p=projects.find(x=>x.id===id);if(p){p.portal_active=val;await db.from('projects').update({portal_active:val}).eq('id',id);}}
+
+// ── MULTI-IMAGE PROOF SECTION ────────────────────────────────────
+function initProofSection(){
+  proofImageList=[];renderProofImageList();
+  document.getElementById('e-proof-url-input').value='';
+  document.getElementById('e-proof-item').value='';
+  document.getElementById('e-proof-note').value='';
+  document.getElementById('proof-confirm-panel').style.display='none';
+  document.getElementById('cld-upload-status').textContent='';
+}
+
+function renderProofImageList(){
+  const el=document.getElementById('proof-image-list');
+  const addCtrl=document.getElementById('proof-add-controls');
+  const urlRow=document.getElementById('proof-url-add-row');
+  const atMax=proofImageList.length>=5;
+  if(!proofImageList.length){
+    el.innerHTML='<p style="font-size:12px;color:var(--text-3);padding:4px 0">No images yet — upload or paste a URL below.</p>';
+  } else {
+    el.innerHTML=proofImageList.map((url,i)=>{
+      const isImg=/cloudinary\.com/.test(url)||/\.(png|jpg|jpeg|gif|webp)(\?|$)/i.test(url);
+      const thumb=isImg?`<img src="${url}" class="proof-img-thumb" alt="">`:' <div class="proof-img-pdf">PDF</div>';
+      const display=url.length>50?url.substring(0,50)+'…':url;
+      return `<div class="proof-img-row">${thumb}<span style="font-size:11px;color:var(--text-2);flex:1;word-break:break-all;min-width:0">${display}</span><button class="btn btn-sm btn-danger" onclick="removeProofImage(${i})" style="flex-shrink:0">✕</button></div>`;
+    }).join('')+(atMax?'<p style="font-size:11px;color:var(--text-3);margin-top:2px">Max 5 images reached.</p>':'');
+  }
+  addCtrl.style.display=atMax?'none':'flex';
+  urlRow.style.display=atMax?'none':'block';
+  resetProofConfirm();
+}
+
+function removeProofImage(i){proofImageList.splice(i,1);renderProofImageList();}
+
+function addProofUrl(){
+  const input=document.getElementById('e-proof-url-input');const url=input.value.trim();if(!url)return;
+  if(proofImageList.length>=5){showToast('Max 5 images — remove one to add another.');return;}
+  proofImageList.push(url);input.value='';renderProofImageList();
+}
+
+const CLD_CLOUD='dft8ujivh',CLD_PRESET='Ashley-studio-proofs';
+async function uploadProofImage(input){
+  const file=input.files?.[0];if(!file)return;
+  if(proofImageList.length>=5){showToast('Max 5 images — remove one to add another.');input.value='';return;}
+  const status=document.getElementById('cld-upload-status'),lbl=document.getElementById('cld-upload-label');
+  status.textContent='Uploading…';lbl.style.opacity='0.6';
+  try{
+    const fd=new FormData();fd.append('file',file);fd.append('upload_preset',CLD_PRESET);
+    const res=await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/auto/upload`,{method:'POST',body:fd});
+    const data=await res.json();
+    if(data.secure_url){proofImageList.push(data.secure_url);renderProofImageList();status.innerHTML='<span style="color:#27500a">✓ Added!</span>';setTimeout(()=>{status.textContent='';},2000);}
+    else{status.innerHTML='<span style="color:#a32d2d">Upload failed</span>';console.error(data);}
+  }catch(e){status.innerHTML='<span style="color:#a32d2d">Upload failed</span>';console.error(e);}
+  lbl.style.opacity='1';input.value='';
+}
+
+function resetProofPanel(){
+  document.getElementById('proof-sent-banner').style.display='none';
+  document.getElementById('proof-input-panel').style.display='block';
+  document.getElementById('proof-confirm-panel').style.display='none';
+  proofImageList=[];renderProofImageList();
+  document.getElementById('e-proof-url-input').value='';
+  document.getElementById('e-proof-item').value='';
+  document.getElementById('e-proof-note').value='';
+}
+
+function resetProofConfirm(){document.getElementById('proof-confirm-panel').style.display='none';}
+
+function previewProof(){
+  if(!proofImageList.length){showToast('Add at least one image before previewing.');return;}
+  const item=document.getElementById('e-proof-item').value.trim();
+  if(!item){const el=document.getElementById('e-proof-item');el.focus();el.style.borderColor='#a32d2d';setTimeout(()=>{el.style.borderColor='';},2000);showToast('Enter an item name so the client knows what they are reviewing.');return;}
+  const p=projects.find(x=>x.id===editId);if(!p)return;
+  const note=document.getElementById('e-proof-note').value.trim();
+  const count=proofImageList.length;
+  document.getElementById('confirm-email').textContent=p.client_email||'(no email on file)';
+  document.getElementById('confirm-subject').textContent='Your '+item+' proof is ready — Ashley Triggiano Fine Art + Stationery';
+  document.getElementById('confirm-item').textContent=item;
+  const lnk=document.getElementById('confirm-link-preview');
+  lnk.href=proofImageList[0];lnk.textContent=count>1?`View proof (${count} images) ↗`:'View your proof ↗';
+  const noteRow=document.getElementById('confirm-note-row');
+  if(note){noteRow.textContent=note;noteRow.style.display='block';}else{noteRow.style.display='none';}
+  document.getElementById('proof-confirm-panel').style.display='block';
+}
+
+// Per-item targets: read the checked pieces; prefill the item name from their labels
+function checkedProofGroups(){
+  return [...document.querySelectorAll('.proof-group-check:checked')]
+    .map(cb=>(projectGroups[editId]||[]).find(g=>String(g.id)===cb.value)).filter(Boolean);
+}
+function onProofGroupChange(){
+  const sel=checkedProofGroups();
+  const statusEl=document.getElementById('proof-group-status');
+  if(sel.length){
+    const labels=sel.map(g=>g.portal_label||g.label);
+    document.getElementById('e-proof-item').value=labels.length>1?labels.slice(0,-1).join(', ')+' & '+labels[labels.length-1]:labels[0];
+    // Group sends always use the input panel, regardless of project-level sent state
+    document.getElementById('proof-sent-banner').style.display='none';
+    document.getElementById('proof-input-panel').style.display='block';
+    statusEl.textContent='This round covers: '+labels.join(', ')+'.'+(sel.some(g=>g.dormant)?' (Includes a dormant piece — it will show as proof-ready in the portal.)':'');
+  }else{
+    statusEl.textContent='Nothing checked = one proof for the whole order (classic mode).';
+    openEdit(editId);switchEditTab('proofs'); // restore project-level panel state
+  }
+}
+
+async function sendProof(){
+  if(!proofImageList.length)return;
+  const urlsCsv=proofImageList.join(',');
+  const item=document.getElementById('e-proof-item').value.trim();
+  const note=document.getElementById('e-proof-note').value.trim();
+  const p=projects.find(x=>x.id===editId);if(!p)return;
+  const selGroups=checkedProofGroups();
+  const btn=document.getElementById('btn-send-proof');
+  btn.textContent='Sending...';btn.disabled=true;
+
+  // Determine round: increment if we're responding to a revision request
+  const revStatuses=['Revision requested','R1 revision requested'];
+  const wasRevision=revStatuses.includes(p.proof_status);
+  const newRound=Math.min(wasRevision?(p.proof_round||0)+1:(p.proof_round||0),2);
+
+  const roundFields=['proof_url','proof_url_r1','proof_url_r2'];
+  const roundStatuses=['Initial design sent','R1 sent','R2 sent'];
+
+  // Email
+  let emailOk=false;
+  if(p.client_email){
+    try{
+      const res=await fetch(EDGE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON},body:JSON.stringify({action:'send_proof_email',client_email:p.client_email,client_name:p.name,item_name:item,proof_url:proofImageList[0],proof_image_count:proofImageList.length,proof_note:note||null,portal_url:'https://ashleytriggiano.com/client-portal?token='+(p.magic_token||'')})});
+      emailOk=res.ok;if(!res.ok){const err=await res.json();console.error('Email error:',err);}
+    }catch(e){console.error('Email error:',e);}
+  }
+
+  const now=new Date().toISOString();
+  const today=now.split('T')[0];
+  setSyncStatus('syncing');
+  if(selGroups.length){
+    // Per-item send: one proof round can cover several pieces (e.g. menus + programs + place
+    // cards). Same images/status stamped on every checked group; one email goes out.
+    const wgUpdates={proof_link:urlsCsv,proof_status:'Sent',phase:'Proofs sent',status:'Proof ready for review',proof_sent_at:now};
+    const{error:ge}=await db.from('workflow_groups').update(wgUpdates).in('id',selGroups.map(g=>g.id));
+    if(ge){showToast('Error saving proof');setSyncStatus('error');btn.textContent='✉ Send email & mark proof sent';btn.disabled=false;return;}
+    selGroups.forEach(g=>Object.assign(g,wgUpdates));
+    // Note: project-level proof_status is left untouched — per-item state lives on the groups
+    const pUpdates={phase:"In client's court",phase_since:today};
+    const{error:pe}=await db.from('projects').update(pUpdates).eq('id',editId);
+    if(!pe)Object.assign(p,pUpdates);
+  }else{
+    const updates={[roundFields[newRound]]:urlsCsv,proof_uploaded_at:now,proof_note:note||null,proof_status:roundStatuses[newRound],proof_round:newRound,phase:"In client's court",phase_since:today};
+    const{error}=await db.from('projects').update(updates).eq('id',editId);
+    if(error){showToast('Error saving proof');setSyncStatus('error');btn.textContent='✉ Send email & mark proof sent';btn.disabled=false;return;}
+    Object.assign(p,updates);
+  }
+  setSyncStatus('ok');
+
+  const msg=emailOk?'Proof sent! Email delivered to '+p.client_email:p.client_email?'Proof saved — email may need Resend API key setup':'Proof saved — no client email on file';
+  showToast(msg);
+  btn.textContent='✉ Send email & mark proof sent';btn.disabled=false;
+  openEdit(editId); // refresh modal to show sent state + updated history
+  renderAll();
+}
+
+// ── MAGIC LINK SENDER ────────────────────────────────────────────
+function openPortalLinkModal(){
+  const sel=document.getElementById('pl-project');sel.innerHTML='<option value="">Choose a project...</option>';
+  [...projects].filter(p=>!isDone(p)).sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{const opt=document.createElement('option');opt.value=p.id;opt.textContent=p.name+(p.magic_token?' (link exists)':'');sel.appendChild(opt);});
+  document.getElementById('pl-details').style.display='none';document.getElementById('pl-send-btn').disabled=true;
+  document.getElementById('modal-portal').classList.add('open');
+}
+
+function openPortalLinkModalForProject(id){closeModal('modal-edit');openPortalLinkModal();document.getElementById('pl-project').value=id;onPortalProjectChange();}
+
+function onPortalProjectChange(){
+  const id=parseInt(document.getElementById('pl-project').value);const btn=document.getElementById('pl-send-btn');
+  if(!id){document.getElementById('pl-details').style.display='none';btn.disabled=true;return;}
+  const p=projects.find(x=>x.id===id);if(!p)return;
+  document.getElementById('pl-details').style.display='block';
+  document.getElementById('pl-email-display').textContent=p.client_email||'(none)';
+  document.getElementById('pl-email-input').value=p.client_email||'';
+  const statusEl=document.getElementById('pl-status-display'),linkRow=document.getElementById('pl-existing-link-row');
+  if(p.magic_token&&p.portal_active){statusEl.innerHTML='<span style="color:#27500a;font-weight:500">Active</span>';const url='https://ashleytriggiano.com/client-portal?token='+p.magic_token;document.getElementById('pl-existing-link').href=url;document.getElementById('pl-existing-link').textContent=url;linkRow.style.display='block';}
+  else if(p.magic_token){statusEl.innerHTML='<span style="color:#633806">Link exists but portal inactive</span>';linkRow.style.display='none';}
+  else{statusEl.innerHTML='<span style="color:var(--text-3)">No portal link yet</span>';linkRow.style.display='none';}
+  document.getElementById('pl-no-email-warn').style.display=!!(p.client_email||'').trim()?'none':'block';
+  document.getElementById('pl-confirm-panel').style.display='none';btn.disabled=false;btn.textContent=p.magic_token?'Regenerate & send link':'Generate & send link';
+}
+
+async function sendPortalLink(){
+  const id=parseInt(document.getElementById('pl-project').value);if(!id)return;
+  const p=projects.find(x=>x.id===id);if(!p)return;
+  const email=document.getElementById('pl-email-input').value.trim();if(!email){const el=document.getElementById('pl-email-input');el.focus();el.style.borderColor='#a32d2d';setTimeout(()=>{el.style.borderColor='';},2000);showToast('Please enter a client email address.');return;}
+  const btn=document.getElementById('pl-send-btn');btn.textContent='Generating...';btn.disabled=true;
+  const newToken=crypto.randomUUID();const expires=new Date(Date.now()+90*24*60*60*1000).toISOString();const portalUrl='https://ashleytriggiano.com/client-portal?token='+newToken;
+  setSyncStatus('syncing');
+  const{error}=await db.from('projects').update({magic_token:newToken,token_expires:expires,portal_active:true,client_email:email}).eq('id',id);
+  if(error){setSyncStatus('error');showToast('Error saving — check connection');btn.textContent=p.magic_token?'Regenerate & send link':'Generate & send link';btn.disabled=false;return;}
+  Object.assign(p,{magic_token:newToken,token_expires:expires,portal_active:true,client_email:email});setSyncStatus('ok');
+  let emailOk=false;
+  try{const res=await fetch(EDGE,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON},body:JSON.stringify({action:'send_portal_email',client_email:email,client_name:p.name,portal_url:portalUrl})});emailOk=res.ok;if(!res.ok){const err=await res.json();console.error('Portal email error:',err);}}catch(e){console.error('Portal email error:',e);}
+  const confirmEl=document.getElementById('pl-confirm-panel');document.getElementById('pl-confirm-email').textContent=email;confirmEl.style.display='block';
+  if(emailOk){confirmEl.style.background='#eaf3de';confirmEl.style.borderColor='#b6dea0';confirmEl.querySelector('p:first-child').textContent='✓ Link sent!';confirmEl.querySelector('p:last-child').textContent='Portal welcome email delivered to '+email+'. Link expires in 90 days.';showToast('Portal link sent to '+email);}
+  else{confirmEl.style.background='#fff8ee';confirmEl.style.borderColor='#f5d89a';confirmEl.querySelector('p:first-child').textContent='⚠ Link generated — email may not have sent';confirmEl.querySelector('p:last-child').textContent='The portal link was saved but the email may have failed. Copy manually: '+portalUrl;showToast('Link saved — check email status');}
+  btn.textContent='Done';btn.disabled=true;renderAll();
+}
+
+// ── DRAG AND DROP ────────────────────────────────────────────────
+let draggedId=null;
+function dragStart(e,id){draggedId=id;e.dataTransfer.effectAllowed='move';requestAnimationFrame(()=>e.target.classList.add('dragging'));}
+function dragEnd(e){e.target.classList.remove('dragging');document.querySelectorAll('.kanban-col.drag-over').forEach(c=>c.classList.remove('drag-over'));}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over');}
+function dragLeave(e){if(!e.currentTarget.contains(e.relatedTarget))e.currentTarget.classList.remove('drag-over');}
+async function drop(e,col){
+  e.preventDefault();col.classList.remove('drag-over');if(!draggedId)return;
+  const newPhase=col.dataset.phase;const p=projects.find(x=>x.id===draggedId);draggedId=null;
+  if(!p||p.phase===newPhase)return;
+  const today=new Date().toISOString().split('T')[0];setSyncStatus('syncing');
+  const{error}=await db.from('projects').update({phase:newPhase,phase_since:today}).eq('id',p.id);
+  if(!error){p.phase=newPhase;p.phase_since=today;setSyncStatus('ok');showToast(p.name+' → '+newPhase);}
+  else{setSyncStatus('error');showToast('Error updating phase — try again');}
+  renderAll();
+}
+
+setView('kanban');
+
+// ---- Studio passphrase gate -------------------------------------------------
+function showGate(msg){
+  let o=document.getElementById('at-gate');
+  if(!o){
+    o=document.createElement('div');
+    o.id='at-gate';
+    o.style.cssText='position:fixed;inset:0;z-index:99999;background:#f0ede7;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    o.innerHTML=
+      '<div style="background:#fff;border:1px solid #e6e1d8;border-radius:14px;padding:34px 32px;max-width:340px;width:90%;text-align:center;box-shadow:0 10px 40px rgba(44,37,25,.12)">'+
+      '<div style="height:3px;width:48px;margin:0 auto 18px;border-radius:3px;background:linear-gradient(90deg,#efd4cb,#6987a8)"></div>'+
+      '<h1 style="font-family:Georgia,serif;font-weight:400;font-size:21px;color:#2c2519;margin:0 0 6px">Studio Command Center</h1>'+
+      '<p style="font-size:13px;color:#7a6e63;margin:0 0 20px">Enter your studio passphrase to continue.</p>'+
+      '<input id="at-gate-input" type="password" autocomplete="current-password" placeholder="Passphrase" '+
+      'style="width:100%;box-sizing:border-box;padding:11px 13px;font-size:14px;border:1px solid #d8d2c8;border-radius:8px;outline:none;margin-bottom:10px"/>'+
+      '<p id="at-gate-msg" style="font-size:12px;color:#a32d2d;min-height:16px;margin:0 0 12px"></p>'+
+      '<button id="at-gate-btn" style="width:100%;padding:11px;font-size:14px;font-weight:500;color:#fff;background:#6987a8;border:none;border-radius:8px;cursor:pointer">Unlock</button>'+
+      '</div>';
+    document.body.appendChild(o);
+    const submit=()=>{const v=document.getElementById('at-gate-input').value.trim();if(!v)return;sessionStorage.setItem('at_studio_key',v);location.reload();};
+    document.getElementById('at-gate-btn').onclick=submit;
+    document.getElementById('at-gate-input').addEventListener('keydown',e=>{if(e.key==='Enter')submit();});
+  }
+  o.style.display='flex';
+  if(msg)document.getElementById('at-gate-msg').textContent=msg;
+  setTimeout(()=>{const i=document.getElementById('at-gate-input');if(i)i.focus();},50);
+}
+
+async function boot(){
+  if(!STUDIO_KEY){showGate('');return;}
+  const ok=await load();
+  if(!ok){
+    // Real connection/database error — do NOT discard the passphrase; let them retry.
+    showGate("Couldn't reach the studio database. Check your connection, then re-enter to retry.");
+    return;
+  }
+  if(!projects.length){
+    // Reached the database fine but got nothing back → passphrase is almost certainly wrong.
+    sessionStorage.removeItem('at_studio_key');
+    showGate('Incorrect passphrase — please try again.');
+  }
+}
+boot();
+</script>
+</body>
+</html>
