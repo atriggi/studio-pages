@@ -665,6 +665,17 @@ const TIME_ESTIMATES = {
   default:                      '2 min',
 }
 
+// Envelope colors (main + RSVP envelope pickers). NOTE: placeholder palette —
+// confirm against Ashley's Collections Guide envelope swatches and adjust names/hexes.
+const ENVELOPE_COLORS = [
+  { name:'White', hex:'#ffffff' }, { name:'Ivory', hex:'#f5efe2' },
+  { name:'Cream', hex:'#f0ede7' }, { name:'Blush', hex:'#efd4cb' },
+  { name:'Dusty blue', hex:'#b7cbd8' }, { name:'Sage', hex:'#cad8c2' },
+  { name:'Terracotta', hex:'#c97b5d' }, { name:'Navy', hex:'#2c3a52' },
+  { name:'Charcoal', hex:'#4a4a4a' }, { name:'Black', hex:'#222222' },
+  { name:'Kraft', hex:'#b8926a' },
+]
+
 // ── FORM FIELD DEFINITIONS ───────────────────────────────────────────
 const FORMS = {
   paper_goods_wording: [
@@ -737,13 +748,37 @@ const FORMS = {
     { key:'details_notes', label:'Notes for the details card', placeholder:'Detail card wording — hotel blocks, reception info, attire…', type:'textarea', req:false },
 
     { divider:true, title:'Step Five — Guest addresses' },
-    { key:'guest_addresses', label:'If you ordered printed guest addressing, paste the link to your Google Sheet of addresses', placeholder:'Google Sheets link (ask Ashley for the template if you need it)', type:'text', req:false },
+    { key:'address_guide', type:'static_html' },
+    { key:'address_file', type:'file_upload', label:'Upload your completed address spreadsheet', accept:'.xls,.xlsx,.numbers,.csv',
+      note:'Excel, Numbers, or CSV format — not PDF or DOC. Download the final file for your records first.', req:false },
 
     { divider:true, title:'Design preferences' },
-    { key:'ink_color', label:'Ink / text color preference', placeholder:'e.g., navy, dusty rose, black', type:'text', req:false },
-    { key:'envelope_color', label:'Envelope color preference', placeholder:'e.g., white, sage, blush', type:'text', req:false },
+    { key:'ink_color', label:'Ink / text color', type:'color_swatches', swatches:'ink', req:false },
+    { key:'envelope_color_main', label:'Main envelope color', type:'color_swatches', swatches:'envelope', req:false },
+    { key:'envelope_color_rsvp', label:'RSVP envelope color (if applicable)', type:'color_swatches', swatches:'envelope', req:false },
     { key:'monogram', label:'Monogram or duogram initials (if applicable)', placeholder:'e.g., S & J or SJC', type:'text', req:false },
     { key:'notes', label:'Anything else', placeholder:'Additional inserts, special wording, notes for Ashley…', type:'textarea', req:false },
+  ],
+  event_invitation: [
+    { key:'event_type', label:'What\'s the event?', type:'radio', req:true,
+      options:[
+        { val:'Welcome party', lbl:'Welcome party' },
+        { val:'Rehearsal dinner', lbl:'Rehearsal dinner' },
+        { val:'Farewell brunch', lbl:'Farewell brunch' },
+        { val:'other', lbl:'Something else (tell us below)' } ] },
+    { key:'event_type_other', label:'If something else — what are we celebrating?', placeholder:'e.g., Engagement party, After-party…', type:'text', req:false },
+    { key:'exact_wording', label:'Have exact wording in mind? Paste it here and skip the fields below', type:'textarea', req:false, callout:true,
+      placeholder:'Not sure? The examples above are great starting points — or fill in the details below and Ashley will craft it.' },
+    { key:'host_line', label:'Who\'s hosting / how should the invitation open?', placeholder:'e.g., Mr. and Mrs. Jonathan Ellis · Together with their families · Let\'s celebrate!', type:'text', req:false },
+    { key:'couple_names', label:'Names as they should appear', placeholder:'e.g., Emily Grace Thompson & Michael James Bennett', type:'text', req:true },
+    { key:'event_date', label:'Event date', placeholder:'e.g., Friday, June 14, 2027', type:'text', req:true },
+    { key:'event_time', label:'Time', placeholder:'e.g., seven o\'clock in the evening · from seven to nine', type:'text', req:true },
+    { key:'venue_name', label:'Venue', placeholder:'e.g., The Greenbrier Room', type:'text', req:true },
+    { key:'venue_city', label:'City & state', placeholder:'e.g., Charlotte, North Carolina', type:'text', req:false },
+    { key:'attire', label:'Attire / dress code (optional)', placeholder:'e.g., Cocktail attire', type:'text', req:false },
+    { key:'extra_line', label:'Closing line (optional)', placeholder:'e.g., Drinks and light bites to follow', type:'text', req:false },
+    { key:'rsvp_line', label:'RSVP line', placeholder:'See the RSVP-line options above — e.g., Kindly reply by June 1 at www.example.com/rsvp', type:'textarea', req:false },
+    { key:'notes', label:'Anything else', placeholder:'Notes for Ashley…', type:'textarea', req:false },
   ],
   std_wording: [
     { key:'exact_wording', label:'Have exact wording in mind? Write it here just as you\'d like it to appear (optional)', placeholder:'Or fill in the fields below and Ashley will craft the wording for you', type:'textarea', req:false },
@@ -851,7 +886,38 @@ const FONT_PICKER_FIELDS = [
   { key:'font_thumbs', type:'font_thumbs', label:'Browse Ashley\'s signature font selections' },
   { key:'font_choice', label:'Which font style(s) do you love?', placeholder:'e.g., Mozart Calligraphy + Climora Serif — or leave blank for Ashley\'s choice', type:'text', req:false },
 ]
-;['paper_goods_wording','std_wording','signage_wording','guestbook_customization','specialty_print_customization','keepsakes_customization'].forEach(k => {
+// Static display blocks referenced by fields of type 'static_html'
+const STATIC_BLOCKS = {
+  address_guide: `
+    <div style="background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 16px 14px">
+      <a href="https://docs.google.com/spreadsheets/d/1ZJfy5IYhz96CbpDb3j_9mvHfRCXA_4tEBr8pMngijPo/edit?usp=sharing" target="_blank"
+        style="display:inline-block;padding:10px 18px;background:var(--blue);color:#fff;border-radius:8px;font-size:12.5px;letter-spacing:.04em;text-decoration:none;margin-bottom:12px">Open the address template ↗</a>
+      <p style="font-size:12.5px;color:var(--ink);line-height:1.6;margin-bottom:8px">A few tips:</p>
+      <ul style="font-size:12.5px;color:var(--muted);line-height:1.7;padding-left:18px;margin-bottom:12px">
+        <li>One address/household per row — formatting instructions are at the top of the spreadsheet</li>
+        <li>Always spell out the state (North Carolina, not NC)</li>
+        <li>Following Emily Post, address invitations formally — spell out all words and use titles (Mr., Mrs., Ms., Dr.)</li>
+      </ul>
+      <p style="font-size:12.5px;color:var(--ink);line-height:1.6;margin-bottom:6px">Quick examples:</p>
+      <ul style="font-size:12.5px;color:var(--muted);line-height:1.7;padding-left:18px;margin-bottom:12px">
+        <li><em>Married couple:</em> Mr. and Mrs. Jonathan Smith <span style="opacity:.75">(same-sex couples in either order, or alphabetical)</span></li>
+        <li><em>One is a doctor:</em> Doctor and Mrs. Jonathan Smith</li>
+        <li><em>Both are doctors:</em> The Doctors Smith · Doctors Jane and John Smith</li>
+        <li><em>Wife uses her maiden name:</em> Mr. Jonathan Smith and Ms. Jane Harris</li>
+        <li><em>Unmarried couple living together:</em> one line — Mr. Jonathan Smith and Ms. Jane Harris</li>
+        <li><em>Plus-one you know by name (not living together):</em> your invitee on the first line, their guest on the second (the "Children"/second-name column)</li>
+        <li><em>Plus-one unknown:</em> Mr. Jonathan Smith and Guest</li>
+        <li><em>Children listed:</em> Mr. and Mrs. Smith on line one, each child's name below (Miss / Mr.)</li>
+        <li><em>Family, children not listed:</em> The Smith Family · Mr. and Mrs. Smith and Family</li>
+      </ul>
+      <p style="font-size:11.5px;color:var(--muted);line-height:1.6">For more specific situations, Emily Post is always the guide. When your addresses are complete, download the final file to your computer for your records, then upload it below.</p>
+      <div style="margin-top:10px;background:#fff8ee;border-left:2px solid #e8c47a;border-radius:6px;padding:10px 12px;font-size:12px;color:#7a5a3a;line-height:1.6">
+        <strong style="color:#5f4526">Please proof carefully.</strong> The addressing software places exactly what's in each cell onto the envelope. One round of envelope revisions is included — revisions beyond that incur a $50 redo fee.
+      </div>
+    </div>`,
+}
+
+;['paper_goods_wording','event_invitation','std_wording','signage_wording','guestbook_customization','specialty_print_customization','keepsakes_customization'].forEach(k => {
   const form = FORMS[k]
   if (!form || form.some(f => f.key === 'font_thumbs')) return
   const notesIdx = form.findIndex(f => f.key === 'notes')
@@ -1272,6 +1338,30 @@ function closeFocused() {
   activeGid = null; activeWg = null
 }
 
+// Spreadsheet upload for guest addresses (Excel / Numbers / CSV only — never PDF or DOC)
+async function uploadFormFile(input, key) {
+  const file = input.files[0]; if (!file) return
+  const status = document.getElementById('fu-status-' + key)
+  if (!/\.(xlsx?|numbers|csv)$/i.test(file.name)) {
+    status.style.color = '#a32d2d'
+    status.textContent = 'Please upload an Excel, Numbers, or CSV file — not PDF or DOC.'
+    input.value = ''; return
+  }
+  status.style.color = 'var(--muted)'; status.textContent = 'Uploading…'
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('upload_preset', 'Ashley-studio-proofs')
+  try {
+    const res = await fetch('https://api.cloudinary.com/v1_1/dft8ujivh/auto/upload', { method:'POST', body:fd })
+    const json = await res.json()
+    if (json.secure_url) {
+      document.getElementById('ff-' + key).value = json.secure_url
+      status.style.color = '#27500a'; status.textContent = '✓ ' + file.name + ' uploaded'
+    } else { status.style.color = '#a32d2d'; status.textContent = 'Upload failed — try again' }
+  } catch { status.style.color = '#a32d2d'; status.textContent = 'Upload failed — try again' }
+  input.value = ''
+}
+
 // Full-screen zoom for the font-selection pages (tap anywhere to close)
 function openFontZoom(src) {
   let o = document.getElementById('font-zoom')
@@ -1345,6 +1435,47 @@ const FORM_GUIDES = {
         </div>`).join('')}
     </div>
     <p style="font-family:var(--sans);font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px">The choices below build each of these lines — pick what feels like you, and Ashley handles the etiquette.</p>`,
+  event_invitation: `
+    <div style="font-family:var(--sans);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:10px">Wording inspiration — from formal to festive</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
+      ${pvGuideCard('Classic &amp; Formal', ['Mr. and Mrs. Jonathan Ellis','request the pleasure of your company at a','Welcome Party','honoring','Emily Grace Thompson &amp; Michael James Bennett','Friday, June 14, 2027','at seven o&rsquo;clock in the evening','The Greenbrier Room','Charlotte, North Carolina'])}
+      ${pvGuideCard('Family Hosted', ['Together with their families,','Sarah Elaine Harper &amp; Jacob Ryan Moore','invite you to a','Welcome Party','to begin the festivities','Friday, August 9, 2027','at seven o&rsquo;clock','The Laurel Hall','Asheville, North Carolina'])}
+      ${pvGuideCard('Warm &amp; Friendly', ['Let&rsquo;s kick off the celebration!','Please join us for a','Welcome Party','honoring','Lily Morgan Adams &amp; Christopher Dean Price','Friday, October 2, 2027','at seven o&rsquo;clock','The Willow House','Durham, North Carolina'])}
+      ${pvGuideCard('Casual &amp; Polished', ['Let the weekend begin!','Join us for a','Welcome Party','celebrating','Hannah Grace Porter &amp; Luke Benjamin Shaw','Friday, November 14, 2027','at seven o&rsquo;clock','The Market Hall','Smithfield, North Carolina','','Drinks and light bites to follow'])}
+      ${pvGuideCard('Come &amp; Go', ['Drop in and say hello!','Join us for a','Welcome Party','honoring','Grace Elizabeth Warren &amp; Noah Daniel Foster','Friday, August 21, 2027','from seven to nine','The Bradford House','Wake Forest, North Carolina'])}
+    </div>
+    <div style="margin-top:14px;font-family:var(--sans);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:10px">RSVP-line options</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
+      ${pvGuideCard('By website', ['<em>Formal</em> — Kindly reply by June 1 at:','www.example.com/rsvp','','<em>Casual</em> — RSVP online by June 1','','<em>QR code</em> — Scan to RSVP by June 1'])}
+      ${pvGuideCard('By email', ['<em>Formal</em> — Kindly reply by June 1 to:','rsvp@example.com','','<em>Casual</em> — Email us your RSVP'])}
+      ${pvGuideCard('By phone or text', ['<em>Formal</em> — Please call to RSVP by June 1:','(555) 123-4567','','<em>Casual</em> — Text to RSVP','','<em>With a contact</em> — RSVP to Sarah by June 1'])}
+    </div>
+    <p style="font-family:var(--sans);font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px">Mix and match — or write your own below and Ashley will polish it.</p>`,
+  signage_wording: `
+    <div style="font-family:var(--sans);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);text-align:center;margin:14px 0 10px">Program wording guide <span style="opacity:.7">(if your order includes programs)</span></div>
+    <div style="background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px">
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:10px">In most cases your officiant provides the ceremony outline — and may want to review it before printing, so allow time for that. Listing the music is optional.</p>
+      <ol style="font-family:var(--serif);font-size:13px;color:var(--ink);line-height:1.8;padding-left:22px;margin-bottom:6px">
+        <li>Prelude music is played</li>
+        <li>Honored guests are ushered to their seats</li>
+        <li>The processional music begins</li>
+        <li>The wedding party processes, followed by the bride and her father</li>
+        <li>The officiant offers greetings, opening remarks, or prayers</li>
+        <li>The couple declare their intent to marry and exchange vows and rings</li>
+        <li>The officiant proclaims the couple married</li>
+        <li>The couple kiss</li>
+        <li>The couple recess, followed by the wedding party, with the recessional music</li>
+      </ol>
+      <p style="font-size:10.5px;color:var(--muted);font-style:italic;margin-bottom:12px">— Emily Post&rsquo;s Wedding Etiquette, 6th Edition</p>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.65">
+        <p style="margin-bottom:7px"><strong style="color:var(--ink);font-weight:500">Wedding party</strong> — parents, grandparents (if present), bridesmaids, groomsmen. Full names are more formal but not required; noting the relationship ("friend of the bride") is personal preference.</p>
+        <p style="margin-bottom:7px"><strong style="color:var(--ink);font-weight:500">In memoriam</strong> — e.g., "the flowers on the altar are in remembrance of…" or a simple "in loving memory" with names.</p>
+        <p style="margin-bottom:7px"><strong style="color:var(--ink);font-weight:500">Thank you</strong> — a note thanking guests for celebrating with you.</p>
+        <p style="margin-bottom:7px"><strong style="color:var(--ink);font-weight:500">At home</strong> — optionally share your address for future cards and gifts (often omitted nowadays).</p>
+        <p style="margin-bottom:7px"><strong style="color:var(--ink);font-weight:500">Reception directions</strong> — helpful if the reception is elsewhere.</p>
+        <p><strong style="color:var(--ink);font-weight:500">Special notes</strong> — an unplugged-ceremony request, how you met, anything uniquely you.</p>
+      </div>
+    </div>`,
 }
 const PREVIEW_BUILDERS = {
   signage_wording(v) {
@@ -1381,14 +1512,17 @@ function updateLivePreview() {
   const el = document.getElementById('fv-preview')
   if (!el) return
   const wg = activeWg
-  // Static wording guide (rendered once, not live) takes precedence over live mockups
-  const guide = wg && FORM_GUIDES[wg.form_type]
-  if (guide) { el.innerHTML = guide; el.style.display = 'block'; return }
+  // A form can have a live mockup (top), a static wording guide (below), or both
+  const guide = (wg && FORM_GUIDES[wg.form_type]) || ''
   const builder = wg && PREVIEW_BUILDERS[wg.form_type]
-  if (!builder) { el.style.display = 'none'; el.innerHTML = ''; return }
-  const fields = (FORMS[wg.form_type] || FORM_DEFAULT).filter(f => !f.divider)
-  try { el.innerHTML = builder(collectFormData(fields)); el.style.display = 'block' }
-  catch (e) { console.error('preview error', e); el.style.display = 'none' }
+  if (!guide && !builder) { el.style.display = 'none'; el.innerHTML = ''; return }
+  let html = ''
+  if (builder) {
+    const fields = (FORMS[wg.form_type] || FORM_DEFAULT).filter(f => !f.divider)
+    try { html += builder(collectFormData(fields)) } catch (e) { console.error('preview error', e) }
+  }
+  el.innerHTML = html + guide
+  el.style.display = 'block'
 }
 // Live-update as the couple types (delegated once; covers text, radios, selects)
 document.getElementById('fv-body').addEventListener('input', updateLivePreview)
@@ -1414,7 +1548,7 @@ function renderField(f, saved) {
   const id = `ff-${f.key}`
 
   if (f.type === 'color_swatches') {
-    const palettes = { ink: INK_COLORS, foil: FOIL_COLORS, napkinDigital: NAPKIN_COLORS_DIGITAL, napkinFoil: NAPKIN_COLORS_FOIL }
+    const palettes = { ink: INK_COLORS, foil: FOIL_COLORS, napkinDigital: NAPKIN_COLORS_DIGITAL, napkinFoil: NAPKIN_COLORS_FOIL, envelope: ENVELOPE_COLORS }
     const palette = palettes[f.swatches] || INK_COLORS
     const selectedName = val || ''
     const swatchHtml = palette.map(c => {
@@ -1496,6 +1630,24 @@ function renderField(f, saved) {
         <span style="font-size:14px;color:var(--ink);line-height:1.5">${esc(o.lbl)}</span>
       </label>`).join('')
     return `<div class="field" id="fw-${f.key}"><label class="field-lbl">${esc(f.label)}${req}</label>${optsHtml}</div>`
+  }
+
+  if (f.type === 'static_html') {
+    return `<div class="field" id="fw-${f.key}">${STATIC_BLOCKS[f.key] || ''}</div>`
+  }
+
+  if (f.type === 'file_upload') {
+    const fileName = val ? decodeURIComponent(val.split('/').pop()) : ''
+    return `<div class="field" id="fw-${f.key}">
+      <label class="field-lbl">${esc(f.label)}${req}</label>
+      ${f.note ? `<p style="font-size:11.5px;color:var(--muted);margin:-2px 0 8px">${esc(f.note)}</p>` : ''}
+      <input type="hidden" id="ff-${f.key}" value="${escAttr(val)}">
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border:1px solid var(--blue);border-radius:8px;color:var(--blue);font-size:13px;cursor:pointer;background:var(--white)">
+        <input type="file" accept="${escAttr(f.accept || '')}" style="display:none" onchange="uploadFormFile(this,'${escAttr(f.key)}')">
+        ↑ Choose file
+      </label>
+      <span id="fu-status-${f.key}" style="font-size:12px;color:var(--muted);margin-left:8px">${fileName ? '✓ ' + esc(fileName) : ''}</span>
+    </div>`
   }
 
   if (f.type === 'font_thumbs') {
