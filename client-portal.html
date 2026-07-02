@@ -691,6 +691,7 @@ const FORMS = {
     { key:'notes', label:'Anything else', placeholder:'Additional inserts, special wording, notes for Ashley…', type:'textarea', req:false },
   ],
   std_wording: [
+    { key:'exact_wording', label:'Have exact wording in mind? Write it here just as you\'d like it to appear (optional)', placeholder:'Or fill in the fields below and Ashley will craft the wording for you', type:'textarea', req:false },
     { key:'couple_names', label:'Names as they should appear', placeholder:'e.g., Sarah & James', type:'text', req:true },
     { key:'wedding_date_formatted', label:'Wedding date', placeholder:'e.g., June 15, 2025', type:'text', req:true },
     { key:'location', label:'City & State', placeholder:'e.g., Raleigh, North Carolina', type:'text', req:true },
@@ -713,8 +714,6 @@ const FORMS = {
     { key:'couple_names', label:'Names as they should appear on the print', placeholder:'e.g., Sarah & James or Sarah Elizabeth Johnson & James William Carter', type:'text', req:true },
     { key:'wedding_date_formatted', label:'Wedding date, as you\'d like it to appear', placeholder:'e.g., June 15, 2025 or the fifteenth of June, two thousand twenty-five', type:'text', req:true },
     { key:'venue_name', label:'Venue name (as it should appear on the print)', placeholder:'e.g., The Bradford Estate', type:'text', req:true },
-    { key:'venue_photo_uploads', label:'Venue photos — upload images (optional)', type:'venue_upload', req:false },
-    { key:'venue_photo_links', label:'Or paste links to venue photos', placeholder:'Google Drive, Dropbox, or image URLs — one per line', type:'textarea', req:false },
     { key:'quote', label:'Quote or phrase (optional — leave blank if none)', placeholder:'e.g., "and so the adventure begins"', type:'textarea', req:false },
     { divider:true, title:'Design preferences' },
     { key:'background_color', label:'Ink color', type:'select', req:true,
@@ -1227,22 +1226,25 @@ function pvSplitCouple(s) {
   const parts = (s || '').split(/\s*(?:&|\band\b)\s*/i).map(x => x.trim()).filter(Boolean)
   return [parts[0] || '', parts.slice(1).join(' & ') || '']
 }
+// Static wording-style guides shown above certain forms (instead of a live mockup).
+function pvGuideCard(title, lines) {
+  return `<div style="background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:18px 14px;text-align:center">
+    <div style="font-family:var(--serif);font-size:17px;color:var(--ink);margin-bottom:10px">${title}</div>
+    <div style="font-family:var(--serif);font-size:12.5px;line-height:1.75;color:var(--muted)">${lines.join('<br>')}</div>
+  </div>`
+}
+const FORM_GUIDES = {
+  std_wording: `
+    <div style="font-family:var(--sans);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:10px">Wording inspiration — a few popular styles</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
+      ${pvGuideCard('Formal', ['Save the Date','for the wedding of','Sally Jane Smith','and','John Paul Jones','Saturday, the twelfth of June','Two thousand twenty-six','Los Angeles, California','Formal invitation to follow'])}
+      ${pvGuideCard('Destination', ['Save the Weekend!','July 23–25, 2026','Emma and Alex','are getting married','Cabo San Lucas, Mexico','Please see further wedding details at','[weddingwebsite].com'])}
+      ${pvGuideCard('Casual', ['He asked and she said &ldquo;Yes!&rdquo;','Zoey and Josh','2.20.26','Las Vegas, Nevada','Invitation to follow'])}
+      ${pvGuideCard('Traditional', ['Save the Date','Lauren and Andrew','are getting married!','September 4, 2026','New York City','Formal invitation to follow'])}
+    </div>
+    <p style="font-family:var(--sans);font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px">Use any of these as a starting point — or write your own below and Ashley will handle the rest.</p>`,
+}
 const PREVIEW_BUILDERS = {
-  std_wording(v) {
-    const [a, b] = pvSplitCouple(v.couple_names)
-    const size = 260
-    return pvFrame(`
-      <div style="font-size:9px;letter-spacing:.35em;text-transform:uppercase;color:var(--muted);font-family:var(--sans)">Save the Date</div>
-      ${pvRule('var(--blue)', .55, '10px auto 14px')}
-      <div style="font-family:var(--script);font-size:${size*.16}px;line-height:.95;color:var(--ink);margin-bottom:6px">${esc(a) || 'Emma'}</div>
-      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.05}px;color:var(--muted);letter-spacing:.06em">&amp;</div>
-      <div style="font-family:var(--script);font-size:${size*.16}px;line-height:.95;color:var(--ink);margin-top:6px">${esc(b) || 'Jake'}</div>
-      ${pvRule('var(--blush-deep)', .8, '14px auto 10px')}
-      <div style="font-family:var(--serif);font-size:${size*.045}px;line-height:1.55;letter-spacing:.03em;color:var(--ink);max-width:85%">${esc(v.wedding_date_formatted) || 'September Twelfth, Two Thousand Twenty-Six'}</div>
-      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.04}px;color:var(--muted);margin-top:6px">${esc(v.location) || 'Asheville, North Carolina'}</div>
-      <div style="margin-top:14px;font-family:var(--sans);font-size:8px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);opacity:.75">Invitation to follow</div>
-    `, { ratio: '5/7', maxW: size, label: 'Save the Date · 5×7 — preview of your wording' })
-  },
   paper_goods_wording(v) {
     const [a, b] = pvSplitCouple(v.couple_names)
     const size = 280
@@ -1275,17 +1277,6 @@ const PREVIEW_BUILDERS = {
       ${pvRule('var(--blush-deep)', .8, '14px auto 8px')}
     `, { ratio: '3/4', maxW: size, label: 'Sign · 18×24 — preview of your wording' })
   },
-  guestbook_customization(v) {
-    const [a, b] = pvSplitCouple(v.couple_names)
-    const size = 260
-    return pvFrame(`
-      <div style="font-family:var(--script);font-size:${size*.13}px;line-height:1;color:var(--ink)">${esc(a) || 'Emma'}${b ? ' &amp; ' + esc(b) : ''}</div>
-      ${pvRule('var(--blue)', .55, '10px auto 8px')}
-      <div style="font-family:var(--serif);font-size:${size*.05}px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)">${esc(v.venue_name) || 'The Bradford Estate'}</div>
-      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.045}px;color:var(--muted);margin-top:4px">${esc(v.wedding_date_formatted) || 'September 12, 2026'}</div>
-      ${v.quote ? pvRule('var(--blush-deep)', .8, '12px auto 8px') + `<div style="font-family:var(--serif);font-style:italic;font-size:${size*.05}px;color:var(--muted);line-height:1.6;max-width:88%">&ldquo;${esc(v.quote)}&rdquo;</div>` : ''}
-    `, { ratio: '5/6', maxW: size, label: 'Guestbook print — preview of your wording' })
-  },
   specialty_print_customization(v) {
     const size = 220
     const napColors = { white:'#fff', blush:'#efd4cb', cream:'#f0ede7', sage:'#cad8c2', slate:'#9aaab8', navy:'#2c3a52', black:'#222' }
@@ -1309,6 +1300,9 @@ function updateLivePreview() {
   const el = document.getElementById('fv-preview')
   if (!el) return
   const wg = activeWg
+  // Static wording guide (rendered once, not live) takes precedence over live mockups
+  const guide = wg && FORM_GUIDES[wg.form_type]
+  if (guide) { el.innerHTML = guide; el.style.display = 'block'; return }
   const builder = wg && PREVIEW_BUILDERS[wg.form_type]
   if (!builder) { el.style.display = 'none'; el.innerHTML = ''; return }
   const fields = (FORMS[wg.form_type] || FORM_DEFAULT).filter(f => !f.divider)
