@@ -668,26 +668,81 @@ const TIME_ESTIMATES = {
 // ── FORM FIELD DEFINITIONS ───────────────────────────────────────────
 const FORMS = {
   paper_goods_wording: [
-    { key:'couple_names', label:'Names as they should appear on the invitation', placeholder:'e.g., Sarah Elizabeth Johnson & James William Carter', type:'text', req:true },
-    { key:'wedding_date_formatted', label:'Wedding date, formatted as you\'d like it to read', placeholder:'e.g., the fifteenth of June, two thousand twenty-five', type:'text', req:true },
-    { divider:true, title:'Ceremony details' },
-    { key:'ceremony_time', label:'Ceremony time', placeholder:'e.g., four o\'clock in the afternoon', type:'text', req:true },
-    { key:'ceremony_venue', label:'Ceremony venue name', placeholder:'e.g., The Bradford', type:'text', req:true },
-    { key:'ceremony_address', label:'Ceremony address', placeholder:'Street, City, State', type:'text', req:true },
-    { key:'reception_info', label:'Reception info (if different, or "Reception to follow")', placeholder:'e.g., Reception to follow · The Ballroom at Park Lane', type:'textarea', req:false },
-    { divider:true, title:'RSVP + extras' },
-    { key:'rsvp_type', label:'RSVP type', type:'radio', req:true,
-      options:[{ val:'mail', lbl:'Traditional mail-in RSVP card' },{ val:'digital', lbl:'Digital / online RSVP' }] },
-    { key:'rsvp_deadline', label:'RSVP by date', placeholder:'e.g., May 1st', type:'text', req:false },
-    { key:'rsvp_address', label:'RSVP return address (if mail-in)', placeholder:'Full address', type:'text', req:false },
+    { divider:true, title:'Step One — Background information' },
+    { key:'wedding_date_formatted', label:'Wedding date', placeholder:'e.g., June 15, 2027', type:'text', req:true },
+    { key:'ceremony_time', label:'Ceremony time', placeholder:'e.g., 4:30 PM', type:'text', req:true },
+    { key:'same_location', label:'Are your reception and ceremony at the same location?', type:'radio', req:true,
+      options:[{ val:'yes', lbl:'Yes' },{ val:'no', lbl:'No' }] },
+    { key:'return_address', label:'Return address for the outside of your envelopes (where undeliverables come back to)', placeholder:'Full address', type:'text', req:true },
+    { key:'venue_same', label:'If ceremony & reception are at the same place — venue name and full address', placeholder:'Name and full address', type:'text', req:false },
+    { key:'ceremony_location', label:'If not the same — where is the ceremony?', placeholder:'Name and full address', type:'text', req:false },
+    { key:'reception_location', label:'If not the same — where is the reception?', placeholder:'Name and full address', type:'text', req:false },
+
+    { divider:true, title:'Step Two — Invitation wording' },
+    { key:'exact_wording', label:'Already have specific invitation wording in mind? Paste it here and skip the guide below', type:'textarea', req:false, callout:true,
+      placeholder:'Not sure? Follow the guide below and Ashley will handle the rest! The studio follows Emily Post etiquette along with Crane\'s Blue Book — and if you\'d like to tweak the wording after the first draft, that\'s no problem at all.' },
+    { key:'announcement_line', label:'Do you want an announcement line?', type:'radio', req:false,
+      options:[{ val:'With great joy', lbl:'With great joy' },{ val:'With joyous hearts', lbl:'With joyous hearts' },{ val:'none', lbl:'No announcement line' },{ val:'other', lbl:'Other (write it below)' }] },
+    { key:'announcement_other', label:'Other announcement / emotive line', placeholder:'Any other wording you might prefer', type:'text', req:false },
+    { key:'hosts', label:'Who is hosting your wedding?', type:'radio', req:false,
+      options:[
+        { val:'couple_families', lbl:'You and your families' },
+        { val:'couple', lbl:'You (the couple)' },
+        { val:'one_set', lbl:'One set of parents' },
+        { val:'both_sets', lbl:'Both sets of parents' },
+        { val:'no_host', lbl:'No one, really — simply "You are invited to the marriage of…" without acknowledging a host' },
+        { val:'one_set_acknowledge', lbl:'One set of parents invites, but also acknowledge the other set beneath the couple\'s names' } ] },
+    { key:'host_names', label:'Host names as they should appear', placeholder:'Traditionally, Mr. and Mrs. Male\'s-First-Name Last Name (e.g., Mr. and Mrs. Roger Smith)', type:'text', req:false },
+    { key:'hosting_notes', label:'Tricky hosting situation?', placeholder:'Unsure how to word it? Just describe it and Ashley can help!', type:'textarea', req:false },
+    { key:'extending', label:'Extending the invitation', type:'radio', req:false,
+      options:[
+        { val:'cordially', lbl:'Cordially invite you to attend' },
+        { val:'honor_company', lbl:'Request the honor of your company (traditional for a house of worship — "honour" if desired)' },
+        { val:'honor_presence', lbl:'Request the honor of your presence (traditional for a house of worship — "honour" if desired)' },
+        { val:'pleasure_company', lbl:'Request the pleasure of your company (traditional outside a house of worship)' },
+        { val:'other', lbl:'Other (write it below)' } ] },
+    { key:'extending_other', label:'Extending the invitation — other', placeholder:'Any other wording you might prefer', type:'text', req:false },
+    { key:'wedding_description', label:'Wedding description', type:'radio', req:false,
+      options:[
+        { val:'at the wedding of', lbl:'at the wedding of' },
+        { val:'at the marriage of', lbl:'at the marriage of' },
+        { val:'at the ceremony uniting', lbl:'at the ceremony uniting' },
+        { val:'other', lbl:'Other (write it below)' } ] },
+    { key:'description_other', label:'Wedding description — other', placeholder:'Any other wording you might prefer', type:'text', req:false },
+    { key:'couple_names', label:'How would you like the couple\'s names listed?', type:'textarea', req:true,
+      placeholder:'Traditionally First Middle Last. If the bride\'s parents\' names are on the invitation, her last name is left off (e.g., "…at the wedding of their daughter Sarah Elizabeth to Roger Adams Smith, son of Mr. and Mrs. Ellis Brown")' },
+
+    { divider:true, title:'Step Three — RSVP card' },
+    { key:'rsvp_deadline', label:'RSVP-by date (digital or mail-in)', placeholder:'Typically 3–6 weeks before the wedding, depending on venue/caterer', type:'text', req:true },
+    { key:'rsvp_address', label:'Where should guests mail their RSVP back to? (mail-in cards only)', placeholder:'Typically whoever is inviting guests — any address that will track your RSVPs', type:'textarea', req:false },
+    { key:'rsvp_includes', label:'Include on the mail-in RSVP card (digital RSVPs direct guests to your wedding website)', type:'checks', req:false,
+      options:[
+        { val:'meal_options', lbl:'Meal options (list them in the wording box below)' },
+        { val:'song_request', lbl:'"I promise to dance if you play ______"' },
+        { val:'dietary', lbl:'Dietary concerns' },
+        { val:'advice', lbl:'Advice for the couple' },
+        { val:'other', lbl:'Other (noted below)' } ] },
+    { key:'rsvp_other', label:'Additional RSVP wording', placeholder:'Other wording / guest meal options (Chicken, Fish, etc.)', type:'text', req:false },
+
+    { divider:true, title:'Step Four — Details card' },
+    { key:'details_includes', label:'Include on the details card (use this for digital RSVPs if you didn\'t order a mail-in card)', type:'checks', req:false,
+      options:[
+        { val:'digital_rsvp', lbl:'Digital RSVP info (the website or email guests use to RSVP)' },
+        { val:'website', lbl:'Wedding / registry website (provide below)' },
+        { val:'hotel', lbl:'Hotel accommodations (provide below)' },
+        { val:'reception', lbl:'Reception information (provide below)' },
+        { val:'things_to_do', lbl:'Things to do around town (provide below)' },
+        { val:'other', lbl:'Other (provide below)' } ] },
     { key:'website_url', label:'Wedding website URL', placeholder:'e.g., sarahandjames.com', type:'text', req:false },
+    { key:'details_notes', label:'Notes for the details card', placeholder:'Detail card wording — hotel blocks, reception info, attire…', type:'textarea', req:false },
+
+    { divider:true, title:'Step Five — Guest addresses' },
+    { key:'guest_addresses', label:'If you ordered printed guest addressing, paste the link to your Google Sheet of addresses', placeholder:'Google Sheets link (ask Ashley for the template if you need it)', type:'text', req:false },
+
     { divider:true, title:'Design preferences' },
     { key:'ink_color', label:'Ink / text color preference', placeholder:'e.g., navy, dusty rose, black', type:'text', req:false },
     { key:'envelope_color', label:'Envelope color preference', placeholder:'e.g., white, sage, blush', type:'text', req:false },
     { key:'monogram', label:'Monogram or duogram initials (if applicable)', placeholder:'e.g., S & J or SJC', type:'text', req:false },
-    { divider:true },
-    { key:'custom_wording', label:'If you have wording that varies from the guide above, write it exactly as you\'d like it to appear', type:'textarea', req:false, callout:true,
-      placeholder:'Optional — write your full wording here and we\'ll use that to populate your first designs.' },
     { key:'notes', label:'Anything else', placeholder:'Additional inserts, special wording, notes for Ashley…', type:'textarea', req:false },
   ],
   std_wording: [
@@ -720,9 +775,7 @@ const FORMS = {
       options:['Black','Claret','Raspberry','Pink','Vintage Blush','Dusty Rose','Lavender','Dusty Blue','Ice Blue','Moss','Sand','Emerald','Lapis','Taupe','Gray','Slate','Custom (describe in notes)'] },
     { key:'background_style', label:'Background style', type:'radio', req:true,
       options:[{ val:'colored', lbl:'Colored background — text appears in white/cream' },{ val:'white', lbl:'White background — selected color used as ink/text color' }] },
-    { key:'font_style', label:'Font style', type:'select', req:true,
-      note:'Not sure? View the font guide at ashleytriggiano.com/product/watercolor-wedding-venue-guestbook/',
-      options:['Mozart Calligraphy','Ecatherina Calligraphy','Quita Calligraphy','Compendium Calligraphy','Antura Calligraphy','LaRoche Script','Modern Symphony Script','Dolce Vita Script','Amelie Script','Mon Voir Script','Giselle Script','Hello Paris Serif','LeGrande Serif','Hello Paris Script','Olivie Script','Boulders Beach Script','Climora Serif','Careter','LaRoche Serif','Crystal Noir','Anna Marie Calligraphy','Monseiur LaDoubase Calligraphy','The Mainsthen Script'] },
+    // Font choice handled by the shared font picker (appended to all customization forms)
     { divider:true },
     { key:'notes', label:'Anything else', placeholder:'Special requests, questions for Ashley…', type:'textarea', req:false },
   ],
@@ -789,6 +842,21 @@ const FORM_DEFAULT = [
   { key:'details', label:'Details for this item', placeholder:'Names, dates, wording, preferences…', type:'textarea', req:true },
   { key:'notes', label:'Anything else', placeholder:'', type:'textarea', req:false },
 ]
+
+// ── SHARED FONT PICKER ───────────────────────────────────────────────
+// Two tap-to-enlarge pages of Ashley's signature font selections + a choice field,
+// inserted into every customization form (just before its "Anything else" notes).
+const FONT_PICKER_FIELDS = [
+  { divider:true, title:'Font styles' },
+  { key:'font_thumbs', type:'font_thumbs', label:'Browse Ashley\'s signature font selections' },
+  { key:'font_choice', label:'Which font style(s) do you love?', placeholder:'e.g., Mozart Calligraphy + Climora Serif — or leave blank for Ashley\'s choice', type:'text', req:false },
+]
+;['paper_goods_wording','std_wording','signage_wording','guestbook_customization','specialty_print_customization','keepsakes_customization'].forEach(k => {
+  const form = FORMS[k]
+  if (!form || form.some(f => f.key === 'font_thumbs')) return
+  const notesIdx = form.findIndex(f => f.key === 'notes')
+  form.splice(notesIdx === -1 ? form.length : notesIdx, 0, ...FONT_PICKER_FIELDS)
+})
 
 // ── PHASE MAPPING ────────────────────────────────────────────────────
 function getPhase(wg) {
@@ -1204,6 +1272,21 @@ function closeFocused() {
   activeGid = null; activeWg = null
 }
 
+// Full-screen zoom for the font-selection pages (tap anywhere to close)
+function openFontZoom(src) {
+  let o = document.getElementById('font-zoom')
+  if (!o) {
+    o = document.createElement('div')
+    o.id = 'font-zoom'
+    o.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(44,37,25,.82);display:flex;align-items:center;justify-content:center;padding:18px;cursor:zoom-out;overflow:auto'
+    o.onclick = () => { o.style.display = 'none' }
+    o.innerHTML = '<img id="font-zoom-img" style="max-width:min(920px,100%);width:100%;height:auto;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.4);margin:auto" alt="Signature font selections">'
+    document.body.appendChild(o)
+  }
+  o.querySelector('#font-zoom-img').src = src
+  o.style.display = 'flex'
+}
+
 // ── LIVE STATIONERY PREVIEWS ─────────────────────────────────────────
 // Ported from the Claude Design prototype (preview.jsx): as the couple types,
 // their wording is typeset live in brand fonts above the form.
@@ -1243,29 +1326,27 @@ const FORM_GUIDES = {
       ${pvGuideCard('Traditional', ['Save the Date','Lauren and Andrew','are getting married!','September 4, 2026','New York City','Formal invitation to follow'])}
     </div>
     <p style="font-family:var(--sans);font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px">Use any of these as a starting point — or write your own below and Ashley will handle the rest.</p>`,
+  paper_goods_wording: `
+    <div style="font-family:var(--sans);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:10px">How an invitation comes together</div>
+    <div style="background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:24px 18px;text-align:center">
+      ${[
+        ['Announcement', 'With great joy', 1],
+        ['The hosts', 'Mr. and Mrs. Robert Johnson', 0],
+        ['The invitation', 'request the honor of your presence', 1],
+        ['Wedding description', 'at the marriage of their daughter', 1],
+        ['The couple', 'Emily Rose &nbsp;<span style="font-style:italic;font-size:.8em">to</span>&nbsp; Michael James Anderson', 0],
+        ['Date &amp; time', 'Saturday, the fifteenth of June<br>two thousand twenty-seven<br>at half after four in the afternoon', 1],
+        ['The venue', 'The Grand Ballroom<br>Charleston, South Carolina', 0],
+        ['Post-ceremony', 'Reception to follow', 1],
+      ].map(([lbl, txt, ital]) => `
+        <div style="margin-bottom:14px">
+          <div style="font-family:var(--sans);font-size:8.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--blush-deep);margin-bottom:3px">${lbl}</div>
+          <div style="font-family:var(--serif);${ital ? 'font-style:italic;' : ''}font-size:${ital ? '13.5' : '15'}px;line-height:1.6;color:var(--ink)">${txt}</div>
+        </div>`).join('')}
+    </div>
+    <p style="font-family:var(--sans);font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px">The choices below build each of these lines — pick what feels like you, and Ashley handles the etiquette.</p>`,
 }
 const PREVIEW_BUILDERS = {
-  paper_goods_wording(v) {
-    const [a, b] = pvSplitCouple(v.couple_names)
-    const size = 280
-    return pvFrame(`
-      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.043}px;color:var(--muted);letter-spacing:.02em">Together with their families,</div>
-      ${pvRule('var(--blue)', .55, '12px auto 10px')}
-      <div style="font-family:var(--script);font-size:${size*.105}px;line-height:1.05;color:var(--ink)">${esc(a) || 'Emma Marie Thompson'}</div>
-      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.05}px;color:var(--muted);margin:2px 0">and</div>
-      <div style="font-family:var(--script);font-size:${size*.105}px;line-height:1.05;color:var(--ink)">${esc(b) || 'Jake Andrew Whitfield'}</div>
-      ${pvRule('var(--blush-deep)', .8, '10px auto 10px')}
-      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.04}px;color:var(--ink);line-height:1.7;letter-spacing:.02em;max-width:92%">request the honor of your presence at their wedding</div>
-      <div style="margin-top:10px;font-family:var(--serif);font-size:${size*.04}px;line-height:1.6;letter-spacing:.05em;color:var(--ink)">
-        ${esc(v.wedding_date_formatted) || 'Saturday, the twelfth of September'}<br>
-        <span style="font-size:${size*.038}px;color:var(--muted)">${esc(v.ceremony_time) || 'half past four in the afternoon'}</span>
-      </div>
-      ${pvRule('var(--blue)', .55, '10px auto')}
-      <div style="font-family:var(--serif);font-size:${size*.045}px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)">${esc(v.ceremony_venue) || 'Belle Maison Estate'}</div>
-      <div style="font-family:var(--serif);font-style:italic;font-size:${size*.038}px;color:var(--muted);margin-top:2px">${esc(v.ceremony_address) || 'Asheville, North Carolina'}</div>
-      <div style="margin-top:12px;font-family:var(--sans);font-size:8px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted)">${esc((v.reception_info || '').split('\n')[0]) || 'Dinner & dancing to follow'}</div>
-    `, { ratio: '5/7.2', maxW: size, label: 'Invitation · 5×7 — preview of your wording' })
-  },
   signage_wording(v) {
     const lines = (v.sign_text || '').split('\n').map(x => x.trim()).filter(Boolean)
     const size = 240
@@ -1404,6 +1485,31 @@ function renderField(f, saved) {
         <span style="font-size:14px;color:var(--ink)">${esc(o.lbl)}</span>
       </label>`).join('')
     return `<div class="field" id="fw-${f.key}"><label class="field-lbl">${esc(f.label)}${req}</label>${optsHtml}</div>`
+  }
+
+  if (f.type === 'checks') {
+    // Multi-select checkboxes; saved value is a comma-joined list of vals
+    const saved_ = (val || '').split(',').map(s => s.trim())
+    const optsHtml = f.options.map(o => `
+      <label class="radio-opt" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:8px">
+        <input type="checkbox" name="field-${f.key}" value="${escAttr(o.val)}" ${saved_.includes(o.val)?'checked':''} style="width:16px;height:16px;accent-color:var(--blue);cursor:pointer;margin-top:2px;flex-shrink:0">
+        <span style="font-size:14px;color:var(--ink);line-height:1.5">${esc(o.lbl)}</span>
+      </label>`).join('')
+    return `<div class="field" id="fw-${f.key}"><label class="field-lbl">${esc(f.label)}${req}</label>${optsHtml}</div>`
+  }
+
+  if (f.type === 'font_thumbs') {
+    // Two pages of Ashley's signature font selections — tap to view full size
+    return `<div class="field" id="fw-${f.key}">
+      <label class="field-lbl">${esc(f.label)}</label>
+      <div style="display:flex;gap:10px">
+        ${['font-selections-1.jpg','font-selections-2.jpg'].map(src => `
+        <a href="javascript:void(0)" onclick="openFontZoom('${src}')" style="flex:1;min-width:0">
+          <img src="${src}" alt="Signature font selections — tap to enlarge" style="width:100%;border:.5px solid var(--border);border-radius:8px;display:block;background:var(--white)" onerror="this.closest('a').style.display='none'">
+        </a>`).join('')}
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:5px">Tap a page to view it full size.</p>
+    </div>`
   }
 
   if (f.type === 'select') {
@@ -1588,6 +1694,10 @@ function collectFormData(fields) {
     if (f.type === 'radio') {
       const sel = document.querySelector(`input[name="field-${f.key}"]:checked`)
       if (sel) fd[f.key] = sel.value
+    } else if (f.type === 'checks') {
+      fd[f.key] = [...document.querySelectorAll(`input[name="field-${f.key}"]:checked`)].map(i => i.value).join(', ')
+    } else if (f.type === 'font_thumbs') {
+      // display-only, nothing to collect
     } else {
       const el = document.getElementById('ff-' + f.key)
       if (el) fd[f.key] = el.value?.trim() || el.value || ''
