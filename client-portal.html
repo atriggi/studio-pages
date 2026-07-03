@@ -1902,13 +1902,17 @@ function renderProofModalBody(mode, wg) {
   }
 
   if (mode === 'review') {
-    // Per-item rounds aren't tracked as a number — derive a friendly label from status.
-    const st = wg?.proof_status || ''
-    eyebrow.textContent = /R2/.test(st) ? 'Final proof' : /R1/.test(st) ? 'Revised proof' : 'Your proof'
+    const used = wg?.revision_round || 0
+    eyebrow.textContent = used >= 2 ? 'Final proof' : used === 1 ? 'Revised proof' : 'Your proof'
+    const roundsMsg = used >= 2
+      ? 'Both included revision rounds have been used — additional changes are billed at $45/hr.'
+      : used === 1
+        ? 'You’ve used 1 of your 2 included revision rounds.'
+        : 'Two rounds of revisions are included.'
     body.innerHTML = `
       ${proofGalleryHtml(wg)}
       <div style="background:rgba(185,155,80,.1);border-left:2px solid rgba(185,155,80,.35);padding:12px 14px;border-radius:6px;font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:16px">
-        <strong style="color:#7a5f10;font-weight:500">A note from Ashley:</strong> Take your time — check every name, date, and address. Two rounds of revisions are included.
+        <strong style="color:#7a5f10;font-weight:500">A note from Ashley:</strong> Take your time — check every name, date, and address. ${roundsMsg}
       </div>
       <div style="display:flex;gap:10px">
         <button onclick="renderProofModalBody('confirm', null)" style="flex:1;padding:14px 16px;background:var(--ink);color:var(--cream);border:0;border-radius:10px;font-family:var(--sans);font-size:12.5px;letter-spacing:.06em;cursor:pointer">Approve proof</button>
@@ -1923,6 +1927,12 @@ function renderProofModalBody(mode, wg) {
         <div style="font-size:24px;margin-bottom:10px">✓</div>
         <div style="font-family:var(--serif);font-size:22px;font-weight:500;color:#2e5a2e;margin-bottom:8px">Ready to approve?</div>
         <p style="font-size:13px;color:#2e5a2e;line-height:1.7;margin-bottom:16px;opacity:.85">Once approved, your proof goes to print and changes are no longer possible. Please make sure every name, date, and detail is correct.</p>
+        <div style="text-align:left;margin-bottom:14px">
+          <label style="display:block;font-family:var(--sans);font-size:11.5px;letter-spacing:.05em;color:#2e5a2e;margin-bottom:6px">TYPE YOUR FULL NAME TO APPROVE</label>
+          <input id="approve-sign-name" type="text" autocomplete="name" placeholder="e.g., Emma Smith"
+            style="width:100%;padding:12px 14px;font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--white);border:1px solid rgba(80,140,80,.4);border-radius:9px;outline:none"/>
+          <p style="font-size:11px;color:#2e5a2e;opacity:.75;line-height:1.6;margin-top:6px">Typing your name acts as your electronic signature — it will be saved with a date and time stamp as your approval to print.</p>
+        </div>
         <div style="display:flex;gap:10px">
           <button onclick="renderProofModalBody('review', find(proofModalGid))" style="flex:1;padding:12px 16px;border-radius:10px;border:1px solid var(--border);background:var(--white);color:var(--muted);cursor:pointer;font-family:var(--sans);font-size:12.5px">Wait, let me check again</button>
           <button class="btn-green" onclick="approvePerItemProof()">Yes, send to print</button>
@@ -1933,27 +1943,36 @@ function renderProofModalBody(mode, wg) {
   if (mode === 'revise') {
     eyebrow.textContent = 'Request changes'
     const wgR = wg || find(proofModalGid)
+    const used = wgR?.revision_round || 0
+    const exhausted = used >= 2
+    const roundBanner = exhausted
+      ? `<div style="background:#fdf3ec;border:1px solid #eabf9d;border-radius:9px;padding:12px 14px;font-size:12.5px;color:#7a4a1e;line-height:1.65;margin-bottom:14px"><strong style="font-weight:500">Both included revision rounds have been used.</strong> Additional design time is billed at $45/hr — Ashley will send an estimate and invoice before making any changes.</div>`
+      : `<p style="font-size:11.5px;color:var(--muted);margin-bottom:14px;opacity:.85">This will use included revision round ${used + 1} of 2.</p>`
     body.innerHTML = `
       ${proofGalleryHtml(wgR)}
-      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">Let Ashley know what you'd like adjusted — scroll the proof above while you write. The more specific, the faster your revised proof will come back.</p>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:10px">Let Ashley know what you'd like adjusted — scroll the proof above while you write. The more specific, the faster your revised proof will come back.</p>
+      ${roundBanner}
       <textarea id="per-item-rev-notes" rows="6" placeholder="e.g., Please change the ceremony time to 5:00 PM and adjust the spacing under our names…"
         style="width:100%;padding:14px;font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--white);border:1px solid var(--border);border-radius:10px;outline:none;min-height:140px;resize:vertical;line-height:1.6"></textarea>
       <div style="display:flex;gap:10px;margin-top:14px">
         <button onclick="renderProofModalBody('review', find(proofModalGid))" style="padding:12px 18px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--sans);font-size:12.5px">← Back</button>
-        <button onclick="submitPerItemRevision()" style="flex:1;padding:12px 16px;border-radius:10px;border:0;background:var(--blue);color:#fff;cursor:pointer;font-family:var(--sans);font-size:12.5px;letter-spacing:.06em">Send to Ashley</button>
+        <button onclick="submitPerItemRevision(${exhausted})" style="flex:1;padding:12px 16px;border-radius:10px;border:0;background:${exhausted ? '#b06a35' : 'var(--blue)'};color:#fff;cursor:pointer;font-family:var(--sans);font-size:12.5px;letter-spacing:.06em">${exhausted ? 'Send request ($45/hr)' : 'Send to Ashley'}</button>
       </div>`
   }
 }
 
 async function approvePerItemProof() {
+  const signName = document.getElementById('approve-sign-name')?.value?.trim()
+  if (!signName) { showToast('Please type your full name to approve.'); document.getElementById('approve-sign-name')?.focus(); return }
   const btn = event?.target
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Sending…' }
   try {
-    const res = await fetch(`${EDGE}?token=${enc(token)}&action=approve-proof&group_id=${proofModalGid}`, { method:'POST' })
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=approve-proof&group_id=${proofModalGid}`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ approved_by: signName }) })
     const json = await res.json()
-    if (!res.ok || json.error) { showToast('Something went wrong. Please contact Ashley.'); if (btn) { btn.disabled = false; btn.textContent = 'Yes, send to print' } return }
+    if (!res.ok || json.error) { showToast(json.error === 'Please type your full name to approve.' ? json.error : 'Something went wrong. Please contact Ashley.'); if (btn) { btn.disabled = false; btn.textContent = 'Yes, send to print' } return }
     const wg = find(proofModalGid)
-    if (wg) { wg.proof_status = 'Approved'; wg.phase = 'Approved' }
+    if (wg) { wg.proof_status = 'Approved'; wg.phase = 'Approved'; wg.proof_approved_by = json.approved_by || signName }
     document.getElementById('proof-overlay').classList.remove('open')
     document.body.style.overflow = ''
     renderPhases(data.workflow_groups || [])
@@ -1961,23 +1980,33 @@ async function approvePerItemProof() {
   } catch { showToast('Connection issue. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = 'Yes, send to print' } }
 }
 
-async function submitPerItemRevision() {
+async function submitPerItemRevision(billable) {
   const notes = document.getElementById('per-item-rev-notes')?.value?.trim()
   if (!notes) { showToast('Please add a note describing the changes first.'); return }
   const btn = event?.target
+  const btnLabel = billable ? 'Send request ($45/hr)' : 'Send to Ashley'
   if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Sending…' }
   try {
     const res = await fetch(`${EDGE}?token=${enc(token)}&action=request-revision&group_id=${proofModalGid}`,
-      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes }) })
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes, billable: billable === true }) })
     const json = await res.json()
-    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = 'Send to Ashley' } return }
+    if (res.status === 409 && json.error === 'rounds_exhausted') {
+      // Server says included rounds are used up — re-render as the billable view (keeps their notes).
+      const wg = find(proofModalGid)
+      if (wg) wg.revision_round = json.rounds_used
+      renderProofModalBody('revise', wg)
+      const ta = document.getElementById('per-item-rev-notes'); if (ta) ta.value = notes
+      showToast('Both included rounds are used — additional changes are billed at $45/hr.')
+      return
+    }
+    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = btnLabel } return }
     const wg = find(proofModalGid)
-    if (wg) { wg.proof_status = 'Revision requested'; wg.phase = 'Revision requested' }
+    if (wg) { wg.proof_status = json.billable ? 'Additional revision requested' : 'Revision requested'; wg.phase = 'Revision requested'; wg.revision_round = json.rounds_used ?? ((wg.revision_round || 0) + 1) }
     document.getElementById('proof-overlay').classList.remove('open')
     document.body.style.overflow = ''
     renderPhases(data.workflow_groups || [])
-    showToast('Revision request sent to Ashley ✓')
-  } catch { showToast('Connection issue. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = 'Send to Ashley' } }
+    showToast(json.billable ? 'Request sent — Ashley will follow up with an estimate ✓' : 'Revision request sent to Ashley ✓')
+  } catch { showToast('Connection issue. Please try again.'); if (btn) { btn.disabled = false; btn.textContent = btnLabel } }
 }
 
 // ── PROJECT-LEVEL PROOF ACTIONS ──────────────────────────────────────
@@ -1986,6 +2015,12 @@ function showApproveConfirm() {
   cta.innerHTML = `
     <div style="background:rgba(80,140,80,.08);border:1px solid rgba(80,140,80,.3);border-radius:10px;padding:16px;text-align:center">
       <p style="font-size:13px;color:#2e5a2e;line-height:1.6;margin-bottom:12px">Once approved, your order will go to print. Please make sure everything looks perfect!</p>
+      <div style="text-align:left;margin-bottom:12px">
+        <label style="display:block;font-family:var(--sans);font-size:11px;letter-spacing:.05em;color:#2e5a2e;margin-bottom:5px">TYPE YOUR FULL NAME TO APPROVE</label>
+        <input id="project-sign-name" type="text" autocomplete="name" placeholder="e.g., Emma Smith"
+          style="width:100%;padding:11px 13px;font-family:var(--sans);font-size:13.5px;color:var(--ink);background:var(--white);border:1px solid rgba(80,140,80,.4);border-radius:8px;outline:none"/>
+        <p style="font-size:10.5px;color:#2e5a2e;opacity:.75;line-height:1.6;margin-top:5px">Typing your name acts as your electronic signature — it will be saved with a date and time stamp as your approval to print.</p>
+      </div>
       <div style="display:flex;gap:8px">
         <button class="btn-outline" style="flex:1" onclick="approveProjectProof()">Yes, approve</button>
         <button class="btn-ghost" style="flex:1" onclick="renderProofBanner(data.project)">Go back</button>
@@ -1994,11 +2029,15 @@ function showApproveConfirm() {
 }
 
 async function approveProjectProof() {
+  const signName = document.getElementById('project-sign-name')?.value?.trim()
+  if (!signName) { showToast('Please type your full name to approve.'); document.getElementById('project-sign-name')?.focus(); return }
   try {
-    const res = await fetch(`${EDGE}?token=${enc(token)}&action=approve-project-proof`, { method:'POST' })
+    const res = await fetch(`${EDGE}?token=${enc(token)}&action=approve-project-proof`,
+      { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ approved_by: signName }) })
     const json = await res.json()
-    if (!res.ok || json.error) { showToast('Something went wrong. Please try again.'); return }
+    if (!res.ok || json.error) { showToast(json.error === 'Please type your full name to approve.' ? json.error : 'Something went wrong. Please try again.'); return }
     data.project.proof_status = 'Approved'
+    data.project.proof_approved_by = json.approved_by || signName
     renderProofBanner(data.project)
     showToast('Proof approved — headed to production 🎉')
   } catch { showToast('Connection issue. Please try again.') }
